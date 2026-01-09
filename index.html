@@ -1,0 +1,2236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CCTV — Visor 3D Pro (v14 Mobile)</title>
+  <style>
+    html, body { margin:0; height:100%; overflow:hidden; background:#0b0f14; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    
+    /* HUD Principal */
+    #hud {
+      position:fixed; left:12px; top:12px; z-index:10;
+      color:#e7eefc; background: rgba(10, 15, 20, 0.85);
+      padding:12px 16px; border-radius:12px; width: 340px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      max-height: 90vh; overflow-y: auto;
+    }
+
+    h3 { margin: 0 0 10px 0; font-size: 16px; display:flex; justify-content:space-between; align-items:center; }
+    .status-dot { width:8px; height:8px; background:#4caf50; border-radius:50%; display:inline-block; margin-right:6px; box-shadow:0 0 8px #4caf50; }
+    
+    /* Controles y Botones */
+    .section { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .section:last-child { border-bottom: none; }
+    
+    .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+    
+    button {
+      flex: 1; cursor:pointer; border:1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05); color:#ccc;
+      padding:6px 10px; border-radius:6px; font-size: 12px; transition: all 0.2s;
+    }
+    button:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    button.active { background: rgba(60, 100, 255, 0.3); border-color: rgba(100, 150, 255, 0.6); color: #fff; box-shadow: 0 0 8px rgba(60, 100, 255, 0.2); }
+    button.danger { color: #ff8888; border-color: rgba(255, 100, 100, 0.2); }
+    button.success { color: #88ffaa; border-color: rgba(100, 255, 150, 0.2); }
+
+    /* Inputs de rango */
+    label { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 6px; }
+    input[type=range] { width: 100%; margin: 4px 0 8px 0; accent-color: #4a90e2; cursor: pointer; }
+    .val-disp { color: #fff; font-weight: bold; }
+
+    /* TextArea y otros */
+    textarea {
+      width: 100%; height: 80px; resize: vertical;
+      background: rgba(0,0,0,0.5); color:#fff;
+      border:1px solid rgba(255,255,255,0.1); border-radius:6px;
+      font-family: monospace; font-size: 11px; margin-top:8px; display:none;
+    }
+    .pill { font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.1); margin-left: auto; }
+
+    /* Notificaciones */
+    #err {
+      position:fixed; left:50%; bottom:20px; transform: translateX(-50%); z-index:20;
+      font: 13px system-ui; color:#fff; background: rgba(20,20,20,0.9);
+      border:1px solid #444; padding:10px 20px; border-radius:20px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.6); display:none; text-align: center;
+    }
+    .success-msg { border-color: #2e7d32 !important; background: rgba(10, 30, 10, 0.95) !important; color: #a5d6a7 !important; }
+      button:disabled, input:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  
+    /* Extras (Plan / Capas) */
+    .small { font-size: 11px; color: #aaa; margin-top: 6px; line-height: 1.25; }
+    select {
+      width: 100%; box-sizing: border-box;
+      padding: 7px 8px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: #e7eefc; margin-top: 6px;
+      outline: none;
+    }
+    option { background:#0b0f14; color:#e7eefc; }
+    button.off { opacity: 0.55; filter: saturate(0.7); }
+
+    input[type=text]{
+      width:100%; box-sizing:border-box;
+      padding:7px 8px; border-radius:10px;
+      border:1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.06);
+      color:#e7eefc; font-size:12px;
+      margin-top:6px; outline:none;
+    }
+    input[type=text]::placeholder{ color: rgba(231,238,252,0.45); }
+    select{
+      width:100%; box-sizing:border-box;
+      padding:6px 8px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.35);
+      color:#e7eefc; font-size:12px;
+      margin-top:6px; outline:none;
+    }
+    input[type=color]{
+      width:100%; height:34px; padding:0;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.35);
+      margin-top:6px;
+    }
+
+    /* --- Mobile / Responsive --- */
+    .iconbtn{ flex:0 !important; padding:4px 8px !important; border-radius:10px !important; }
+    #hud.collapsed{ width:auto; max-height:none; overflow:hidden; }
+    #hud.collapsed .section{ display:none; }
+    @media (max-width: 900px){
+      #hud{ width: calc(100vw - 16px); left:8px; top:8px; padding:12px 12px; border-radius:14px; max-height: 72vh; }
+      button{ font-size:13px; padding:10px 12px; border-radius:12px; }
+      label{ font-size:12px; }
+      .pill{ font-size:11px; }
+      input[type=text]{ padding:10px 10px; border-radius:12px; font-size:13px; }
+      select{ padding:10px 10px; border-radius:12px; font-size:13px; }
+    }
+
+</style>
+</head>
+<body>
+
+  <div id="hud">
+    <h3>
+      <span><span class="status-dot"></span>CCTV Visor Pro v15 Mobile</span>
+      <span style="display:flex; gap:6px; align-items:center;">
+      <button id="btnHudToggle" class="iconbtn" title="Mostrar/Ocultar panel">☰</button>
+      <span id="scalePill" class="pill">Sin Calibrar</span>
+    </span>
+    </h3>
+
+    <div class="section">
+      <label>HERRAMIENTAS GLOBALES</label>
+      <div class="row">
+        <button id="btnReset">👁️ Reset Vista</button>
+        <button id="btnScale">📏 Calibrar (Metros)</button>
+        <button id="btnToggleBld">🏢 Edificios</button>
+        <button id="btnLockView">🔒 Bloquear Fondo</button>
+        <button id="btnLockAll">🔒 Bloquear TODO</button>
+        <button id="btnMeasure">📐 Distancia</button>
+        <button id="btnArea">🔳 Área</button>
+        <button id="btnCloseArea" class="success" disabled>✅ Cerrar Área</button>
+        <button id="btnClearMeasure" class="danger">🧽 Limpiar</button>
+      </div>
+      <div id="measureInfo" class="small"></div>
+    </div>
+
+    <div class="section">
+      <label>VISUAL</label>
+      <div class="row">
+        <button id="btnFog">🌫️ Niebla</button>
+        <button id="btnShadows">☀️ Sombras</button>
+        <button id="btnEdges">🧊 Bordes</button>
+        <button id="btnMobile">📱 Modo móvil</button>
+      </div>
+      <div>
+        <label>Brillo / Exposición: <span id="valExp" class="val-disp">1.45</span>x</label>
+        <input type="range" id="rngExp" min="0.8" max="2.6" step="0.05" value="1.45">
+      </div>
+      <div>
+        <label>Relieve (3D): <span id="valBump" class="val-disp">0.25</span></label>
+        <input type="range" id="rngBump" min="0" max="0.8" step="0.05" value="0.25">
+      </div>
+    </div>
+
+
+    <div class="section">
+      <label>REPORTE / CAPTURA</label>
+      <input id="txtSite" type="text" placeholder="Nombre del sitio (ej. Base Lerdo)" />
+      <div class="row">
+        <button id="btnShot" class="success">📸 Capturar PNG</button>
+      </div>
+      <div class="small">Tip: apaga Conos/Etiquetas si quieres una captura más limpia.</div>
+    </div>
+
+    <div class="section">
+      <label>CONFIGURACIÓN DE CÁMARA <span id="camStatus" style="color:#4a90e2"></span></label>
+      <div class="row" style="margin-bottom:10px;">
+        <button id="btnCam" style="flex:2">📹 MODO CÁMARA</button>
+        <button id="btnClearCams" class="danger">Borrar Cams</button>
+      </div>
+      
+      <div id="camControls" style="opacity:0.5; pointer-events:none; transition: opacity 0.3s;">
+        <label>Altura: <span id="valH" class="val-disp">3.0</span> m</label>
+        <input type="range" id="rngH" min="1" max="15" step="0.5" value="3.0">
+
+        <label>Ángulo Inclinación: <span id="valA" class="val-disp">20</span>°</label>
+        <input type="range" id="rngA" min="0" max="90" step="5" value="20">
+
+        <label>Distancia Visión: <span id="valD" class="val-disp">30</span> m</label>
+        <input type="range" id="rngD" min="5" max="150" step="5" value="30">
+
+
+        <label>Yaw (Giro): <span id="valYaw" class="val-disp">0</span>°</label>
+        <input type="range" id="rngYaw" min="-180" max="180" step="5" value="0">
+      </div>
+    </div>
+
+
+    <div class="section">
+      <label>CAPAS</label>
+      <div class="row">
+        <button id="btnLayerCams" class="success">📹 Cámaras</button>
+        <button id="btnLayerCones" class="success">🔺 Conos</button>
+        <button id="btnLayerLabels" class="success">🏷️ Etiquetas</button>
+      </div>
+      <div class="small">Apaga Conos/Etiquetas cuando estés acomodando posiciones para ver mejor el terreno.</div>
+    </div>
+
+    <div class="section">
+      <label>PLAN DE CÁMARAS (EXCEL)</label>
+      <div id="planInfo" class="small">Cargando plan...</div>
+      <select id="planSelect"></select>
+      <div class="row">
+        <button id="btnPlanPlace" class="success">📌 Colocar seleccionada</button>
+        <button id="btnPlanNext">⏭️ Siguiente</button>
+      </div>
+      <div class="row">
+        <button id="btnPlanReload">🔄 Recargar plan</button>
+        <button id="btnPlanReset" class="danger">↺ Reset colocadas</button>
+      </div>
+      <div class="small">Tip: pon MODO CÁMARA y luego solo ve “colocando” una por una con tu lista.</div>
+    </div>
+
+
+
+
+    <div class="section">
+      <label>EDICIÓN</label>
+      <div class="row">
+        <button id="btnEditBld">✏️ Editar Edificios</button>
+        <button id="btnEditCam">✏️ Editar Cámaras</button>
+      </div>
+      <div class="row">
+        <button id="btnAddBld" class="success">➕ Nuevo Edificio</button>
+        <button id="btnDeleteSel" class="danger">🗑️ Borrar Selección</button>
+      </div>
+
+      <div id="bldControls" style="opacity:0.5; pointer-events:none; transition: opacity 0.3s;">
+        <label>Ancho (W): <span id="valBW" class="val-disp">10</span> m</label>
+        <input type="range" id="rngBW" min="1" max="200" step="1" value="10">
+
+        <label>Fondo (D): <span id="valBD" class="val-disp">10</span> m</label>
+        <input type="range" id="rngBD" min="1" max="200" step="1" value="10">
+
+        <label>Altura (H): <span id="valBH" class="val-disp">5.0</span> m</label>
+        <input type="range" id="rngBH" min="1" max="50" step="0.5" value="5">
+      </div>
+    </div>
+    
+    <div class="section" id="styleSection">
+      <label>ESTILO (SELECCIÓN)</label>
+      <div id="styleNone" class="small">Selecciona un <b>edificio</b> o una <b>cámara</b> (en modo edición) para cambiar color/textura.</div>
+
+      <div id="styleBld" style="display:none; margin-top:8px;">
+        <div class="small" style="margin-bottom:6px;">Edificio: <span id="styleBldName" class="val-disp">—</span></div>
+        <label>Color del edificio</label>
+        <input id="bldColor" type="color" value="#dfe6ea">
+
+        <label style="margin-top:8px;">Textura del edificio</label>
+        <select id="bldTex">
+          <option value="">— Ninguna —</option>
+          <option value="./assets/textures/wall_white_concrete.jpg">Concreto blanco (muro)</option>
+          <option value="./assets/textures/roof_blue.jpg">Techo azul</option>
+          <option value="./assets/textures/roof_white.jpg">Techo blanco</option>
+          <option value="./assets/textures/ground_concrete.jpg">Concreto (suelo)</option>
+          <option value="./assets/textures/ground_dirt.jpg">Tierra (suelo)</option>
+          <option value="./assets/textures/c.jpg">Textura “c.jpg”</option>
+        </select>
+
+        <label>Escala textura: <span id="valBldTexScale" class="val-disp">1.00</span>x</label>
+        <input type="range" id="bldTexScale" min="0.25" max="8" step="0.25" value="1">
+        <div class="small">Tip: 2–4x suele verse mejor que 1x.</div>
+      </div>
+
+      <div id="styleCam" style="display:none; margin-top:8px;">
+        <div class="small" style="margin-bottom:6px;">Cámara: <span id="styleCamId" class="val-disp">—</span></div>
+
+        <label>Color cuerpo</label>
+        <input id="camBodyColor" type="color" value="#ff3333">
+
+        <label style="margin-top:8px;">Color poste</label>
+        <input id="camPoleColor" type="color" value="#2a2a2a">
+
+        <label style="margin-top:8px;">Color cono</label>
+        <input id="camConeColor" type="color" value="#00ff66">
+
+        <label style="margin-top:8px;">Textura cuerpo</label>
+        <select id="camTex">
+          <option value="">— Ninguna —</option>
+          <option value="./assets/textures/wall_white_concrete.jpg">Concreto blanco</option>
+          <option value="./assets/textures/c.jpg">Textura “c.jpg”</option>
+        </select>
+
+        <label>Escala textura: <span id="valCamTexScale" class="val-disp">1.00</span>x</label>
+        <input type="range" id="camTexScale" min="0.25" max="8" step="0.25" value="1">
+      </div>
+    </div>
+
+<div class="section">
+      <label>PERÍMETRO / CERCADO</label>
+      <div class="row">
+        <button id="btnPer">🚧 Modo Perímetro</button>
+        <button id="btnUndoPer">↩️ Deshacer</button>
+      </div>
+      <div class="row">
+        <button id="btnFinishPer" class="success">✅ Cerrar/Generar</button>
+        <button id="btnClearPer" class="danger">🗑️ Borrar Todo</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <label>GESTIÓN DE DATOS (JSON)</label>
+      <div class="row">
+        <button id="btnExport">💾 Exportar</button>
+        <button id="btnImport">📂 Importar</button>
+        <button id="btnWipe" class="danger">⚠️ Reset Total</button>
+      </div>
+      <textarea id="out" placeholder="Copia/Pega JSON aquí..."></textarea>
+    </div>
+
+    <div style="font-size:10px; color:#888; text-align:center; margin-top:5px;">
+      <span id="autoStatus">Auto-guardado: —</span>
+    </div>
+  </div>
+
+  <div id="err"></div>
+
+  <script type="module">
+    // --- Referencias UI ---
+    const ui = {
+      err: document.getElementById('err'),
+      out: document.getElementById('out'),
+      autoStatus: document.getElementById('autoStatus'),
+      scalePill: document.getElementById('scalePill'),
+      btnHudToggle: document.getElementById('btnHudToggle'),
+      btnReset: document.getElementById('btnReset'),
+      btnScale: document.getElementById('btnScale'),
+      btnToggleBld: document.getElementById('btnToggleBld'),
+      btnLockView: document.getElementById('btnLockView'),
+      btnLockAll: document.getElementById('btnLockAll'),
+      btnMeasure: document.getElementById('btnMeasure'),
+      btnArea: document.getElementById('btnArea'),
+      btnCloseArea: document.getElementById('btnCloseArea'),
+      btnClearMeasure: document.getElementById('btnClearMeasure'),
+      measureInfo: document.getElementById('measureInfo'),
+      btnFog: document.getElementById('btnFog'),
+      btnMobile: document.getElementById('btnMobile'),
+      btnShadows: document.getElementById('btnShadows'),
+      btnEdges: document.getElementById('btnEdges'),
+      rngExp: document.getElementById('rngExp'),
+      valExp: document.getElementById('valExp'),
+      rngBump: document.getElementById('rngBump'),
+      valBump: document.getElementById('valBump'),
+
+      // Reporte / Captura
+      txtSite: document.getElementById('txtSite'),
+      btnShot: document.getElementById('btnShot'),
+
+      // Estilo (selección)
+      styleNone: document.getElementById('styleNone'),
+      styleBld: document.getElementById('styleBld'),
+      styleCam: document.getElementById('styleCam'),
+      styleBldName: document.getElementById('styleBldName'),
+      styleCamId: document.getElementById('styleCamId'),
+      bldColor: document.getElementById('bldColor'),
+      bldTex: document.getElementById('bldTex'),
+      bldTexScale: document.getElementById('bldTexScale'),
+      valBldTexScale: document.getElementById('valBldTexScale'),
+      camBodyColor: document.getElementById('camBodyColor'),
+      camPoleColor: document.getElementById('camPoleColor'),
+      camConeColor: document.getElementById('camConeColor'),
+      camTex: document.getElementById('camTex'),
+      camTexScale: document.getElementById('camTexScale'),
+      valCamTexScale: document.getElementById('valCamTexScale'),
+      btnCam: document.getElementById('btnCam'),
+      btnClearCams: document.getElementById('btnClearCams'),
+      camControls: document.getElementById('camControls'),
+      btnPer: document.getElementById('btnPer'),
+      btnUndoPer: document.getElementById('btnUndoPer'),
+      btnFinishPer: document.getElementById('btnFinishPer'),
+      btnClearPer: document.getElementById('btnClearPer'),
+      btnExport: document.getElementById('btnExport'),
+      btnImport: document.getElementById('btnImport'),
+      btnWipe: document.getElementById('btnWipe'),
+      rngH: document.getElementById('rngH'),
+      rngA: document.getElementById('rngA'),
+      rngD: document.getElementById('rngD'),
+      valH: document.getElementById('valH'),
+      valA: document.getElementById('valA'),
+      valD: document.getElementById('valD'),
+      rngYaw: document.getElementById('rngYaw'),
+      valYaw: document.getElementById('valYaw'),
+
+      btnEditBld: document.getElementById('btnEditBld'),
+      btnEditCam: document.getElementById('btnEditCam'),
+      btnAddBld: document.getElementById('btnAddBld'),
+      btnDeleteSel: document.getElementById('btnDeleteSel'),
+
+      bldControls: document.getElementById('bldControls'),
+      rngBW: document.getElementById('rngBW'),
+      rngBD: document.getElementById('rngBD'),
+      rngBH: document.getElementById('rngBH'),
+      valBW: document.getElementById('valBW'),
+      valBD: document.getElementById('valBD'),
+      valBH: document.getElementById('valBH'),
+
+      // Capas
+      btnLayerCams: document.getElementById('btnLayerCams'),
+      btnLayerCones: document.getElementById('btnLayerCones'),
+      btnLayerLabels: document.getElementById('btnLayerLabels'),
+
+      // Plan (Excel)
+      planInfo: document.getElementById('planInfo'),
+      planSelect: document.getElementById('planSelect'),
+      btnPlanPlace: document.getElementById('btnPlanPlace'),
+      btnPlanNext: document.getElementById('btnPlanNext'),
+      btnPlanReload: document.getElementById('btnPlanReload'),
+      btnPlanReset: document.getElementById('btnPlanReset'),
+    };
+
+    const hud = document.getElementById('hud');
+    ui.btnHudToggle?.addEventListener('click', () => {
+      hud.classList.toggle('collapsed');
+    });
+
+    const camSettings = { h: 3.0, angle: 20, dist: 30 };
+
+    function updateCamUI(){
+      camSettings.h = parseFloat(ui.rngH.value);
+      camSettings.angle = parseFloat(ui.rngA.value);
+      camSettings.dist = parseFloat(ui.rngD.value);
+      ui.valH.textContent = camSettings.h.toFixed(1);
+      ui.valA.textContent = camSettings.angle;
+      ui.valD.textContent = camSettings.dist;
+    }
+
+    function applyCamEditFromSliders(){
+      if(mode !== 'camedit') return;
+      if(selected.kind !== 'camera') return;
+      const idx = selected.idx;
+      const c = state.cameras[idx];
+      if(!c) return;
+      c.h = parseFloat(ui.rngH.value);
+      c.angle = parseFloat(ui.rngA.value);
+      c.dist = parseFloat(ui.rngD.value);
+      c.yaw = (parseFloat(ui.rngYaw.value) * Math.PI / 180);
+      renderCameras();
+      setCameraSelected(idx);
+      saveLocal();
+    }
+
+    ui.rngH.addEventListener('input', updateCamUI);
+    ui.rngA.addEventListener('input', updateCamUI);
+    ui.rngD.addEventListener('input', updateCamUI);
+    ui.rngYaw.addEventListener('input', updateYawUI);
+
+    ui.rngH.addEventListener('input', applyCamEditFromSliders);
+    ui.rngA.addEventListener('input', applyCamEditFromSliders);
+    ui.rngD.addEventListener('input', applyCamEditFromSliders);
+    ui.rngYaw.addEventListener('input', applyCamEditFromSliders);
+
+    // Estilo (colores / texturas)
+    if(ui.bldColor) ui.bldColor.addEventListener('input', applyBuildingStyleFromUI);
+    if(ui.bldTex) ui.bldTex.addEventListener('change', applyBuildingStyleFromUI);
+    if(ui.bldTexScale) ui.bldTexScale.addEventListener('input', applyBuildingStyleFromUI);
+
+    if(ui.camBodyColor) ui.camBodyColor.addEventListener('input', applyCameraStyleFromUI);
+    if(ui.camPoleColor) ui.camPoleColor.addEventListener('input', applyCameraStyleFromUI);
+    if(ui.camConeColor) ui.camConeColor.addEventListener('input', applyCameraStyleFromUI);
+    if(ui.camTex) ui.camTex.addEventListener('change', applyCameraStyleFromUI);
+    if(ui.camTexScale) ui.camTexScale.addEventListener('input', applyCameraStyleFromUI);
+
+
+    function updateYawUI(){
+      ui.valYaw.textContent = parseFloat(ui.rngYaw.value);
+    }
+
+    async function loadThree() {
+      // Offline-first: usamos SOLO el vendor local para evitar:
+      // 1) errores por red / CORS
+      // 2) el warning de "Multiple instances of Three.js" (cuando mezclas CDN + local)
+      //
+      // Si algo falla aquí, casi siempre es porque vendor/Controls.js está corrupto
+      // (por ejemplo, descargado como HTML 404). Ya está corregido en este proyecto.
+      try {
+        const T = await import('./vendor/three.module.js');
+        const O = await import('./vendor/OrbitControls.js');
+        return { THREE: T, OrbitControls: O.OrbitControls };
+      } catch (e) {
+        throw new Error(
+          'No se pudo cargar Three.js local. Verifica que existan ./vendor/three.module.js, ./vendor/OrbitControls.js y ./vendor/Controls.js (válido).'
+        );
+      }
+    }
+
+    let THREE, OrbitControls;
+    try {
+      const lib = await loadThree();
+      THREE = lib.THREE;
+      OrbitControls = lib.OrbitControls;
+    } catch (e) {
+      showMsg("❌ Error crítico: " + e.message, true);
+      throw e;
+    }
+
+    
+    // --- Optimización móvil (auto) ---
+    const IS_MOBILE = (matchMedia && matchMedia('(pointer:coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const PERF_KEY = 'cctv_mobile_perf_v1';
+    let mobilePerf = IS_MOBILE;
+    try {
+      const savedPerf = JSON.parse(localStorage.getItem(PERF_KEY) || '{}');
+      if(typeof savedPerf.mobilePerf === 'boolean') mobilePerf = savedPerf.mobilePerf;
+    } catch(e) {}
+    function savePerf(){ try { localStorage.setItem(PERF_KEY, JSON.stringify({ mobilePerf })); } catch(e) {} }
+
+const scene = new THREE.Scene();
+    // Fondo un poco más claro para que el sitio no se sienta “apagado”.
+    scene.background = new THREE.Color(0x151d26);
+    // Niebla apagada por defecto (porque oscurece mucho). Se puede activar con el botón 🌫️.
+    scene.fog = null;
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 2000);
+    const renderer = new THREE.WebGLRenderer({ antialias: !mobilePerf, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, mobilePerf ? 1.0 : 1.5));
+    // Color correcto (evita que texturas se vean "gris" o demasiado oscuras)
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Brillo controlado por exposición (ajustable en el panel)
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = parseFloat(ui.rngExp?.value || '1.45');
+    // Iluminación en modo "legacy" para que intensidades sean más intuitivas (y no se vea oscuro)
+    renderer.useLegacyLights = true;
+    renderer.shadowMap.enabled = !mobilePerf;
+    renderer.shadowMap.type = mobilePerf ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI/2 - 0.05;
+
+    // --- Bloqueo de fondo (bloquea movimiento de la vista) ---
+    let viewLocked = false;
+    function setViewLocked(on, silent=false){
+      viewLocked = !!on;
+      controls.enabled = !viewLocked;
+      ui.btnLockView.classList.toggle('active', viewLocked);
+      ui.btnLockView.textContent = viewLocked ? '🔓 Desbloquear Fondo' : '🔒 Bloquear Fondo';
+      if(!silent){
+        showMsg(viewLocked ? '🔒 Fondo bloqueado: la vista no se moverá.' : '🔓 Fondo desbloqueado: puedes mover la vista.', true);
+      }
+    }
+    
+    let allLocked = false;
+    function setAllLocked(on, silent=false){
+      allLocked = !!on;
+      ui.btnLockAll.classList.toggle('active', allLocked);
+      ui.btnLockAll.textContent = allLocked ? '🔓 Desbloquear TODO' : '🔒 Bloquear TODO';
+
+      const lockables = [
+        ui.btnScale, ui.btnMeasure, ui.btnArea, ui.btnCloseArea, ui.btnClearMeasure, ui.btnCam, ui.btnPer,
+        ui.btnUndoPer, ui.btnFinishPer, ui.btnClearPer,
+        ui.btnClearCams, ui.btnEditBld, ui.btnEditCam,
+        ui.btnAddBld, ui.btnDeleteSel,
+        ui.btnImport, ui.btnWipe,
+        ui.rngH, ui.rngA, ui.rngD, ui.rngYaw,
+        ui.rngBW, ui.rngBD, ui.rngBH
+      ];
+
+      lockables.forEach(el => { if(el) el.disabled = allLocked; });
+
+      if(allLocked){
+        // sale de cualquier modo de edición para evitar accidentes
+        isDragging = false;
+        selected.kind = null; selected.idx = null;
+        setMode('nav');
+        // deja la navegación activa (a menos que el fondo esté bloqueado)
+        if(!viewLocked) controls.enabled = true;
+      }
+
+      if(!silent){
+        showMsg(allLocked
+          ? '🔒 TODO bloqueado: no podrás editar/mover. Solo navegar.'
+          : '🔓 TODO desbloqueado: edición habilitada.', true);
+      }
+    }
+
+    // --- VISUAL (Brillo/Niebla) ---
+    let sceneReady = false;
+    const VIS_KEY = 'cctv_visual_v7';
+    const visual = { exposure: 1.45, fog: false, shadows: !mobilePerf, edges: !mobilePerf, bump: mobilePerf ? 0.15 : 0.25 };
+    try {
+      const saved = JSON.parse(localStorage.getItem(VIS_KEY) || '{}');
+      if(typeof saved.exposure === 'number') visual.exposure = saved.exposure;
+      if(typeof saved.fog === 'boolean') visual.fog = saved.fog;
+      if(typeof saved.shadows === 'boolean') visual.shadows = saved.shadows;
+      if(typeof saved.edges === 'boolean') visual.edges = saved.edges;
+      if(typeof saved.bump === 'number') visual.bump = saved.bump;
+    } catch(e) {}
+
+    function saveVisual(){
+      try { localStorage.setItem(VIS_KEY, JSON.stringify(visual)); } catch(e) {}
+    }
+
+    function setExposure(v){
+      const val = Math.max(0.8, Math.min(2.6, Number(v) || 1.45));
+      visual.exposure = val;
+      renderer.toneMappingExposure = val;
+      if(ui.valExp) ui.valExp.textContent = val.toFixed(2);
+      saveVisual();
+    }
+
+    function setFog(on, silent=false){
+      visual.fog = !!on;
+      scene.fog = visual.fog ? new THREE.Fog(scene.background.getHex(), 60, 700) : null;
+      if(ui.btnFog){
+        ui.btnFog.classList.toggle('active', visual.fog);
+        ui.btnFog.textContent = visual.fog ? '🌫️ Niebla: ON' : '🌫️ Niebla';
+      }
+      saveVisual();
+      if(!silent) showMsg(visual.fog ? '🌫️ Niebla activada.' : '🌫️ Niebla desactivada.', true);
+    }
+
+    function setBump(v, silent=false){
+      const val = Math.max(0, Math.min(0.8, Number(v) || 0));
+      visual.bump = val;
+      if(ui.valBump) ui.valBump.textContent = val.toFixed(2);
+      // Aplicar a materiales (suelo + edificios) cuando el 3D ya esté listo
+      if(sceneReady) applyReliefToScene();
+      saveVisual();
+      if(!silent) showMsg(val > 0 ? '🧱 Relieve activado.' : '🧱 Relieve desactivado.', true);
+    }
+
+
+    // Aplicar defaults guardados
+    if(ui.rngExp){ ui.rngExp.value = String(visual.exposure); }
+    if(ui.rngBump){ ui.rngBump.value = String(visual.bump); }
+    setExposure(visual.exposure);
+    setFog(visual.fog, true);
+    setBump(visual.bump, true);
+
+    ui.rngExp?.addEventListener('input', () => setExposure(ui.rngExp.value));
+    ui.btnFog?.addEventListener('click', () => setFog(!visual.fog));
+    ui.rngBump?.addEventListener('input', () => setBump(ui.rngBump.value));
+
+    // Luz suave general (subida para que el terreno se vea claro)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
+    scene.add(hemiLight);
+
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    dirLight.position.set(100, 200, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = mobilePerf ? 1024 : 2048;
+    dirLight.shadow.mapSize.height = mobilePerf ? 1024 : 2048;
+    dirLight.shadow.camera.left = -200; dirLight.shadow.camera.right = 200;
+    dirLight.shadow.camera.top = 200; dirLight.shadow.camera.bottom = -200;
+    scene.add(dirLight);
+
+    // --- Sombras (toggle) ---
+    function setShadows(on, silent=false){
+      visual.shadows = !!on;
+      renderer.shadowMap.enabled = visual.shadows;
+      dirLight.castShadow = visual.shadows;
+      // Objetos ya tienen cast/receive; solo escondemos el cómputo de sombras
+      if(ui.btnShadows){
+        ui.btnShadows.classList.toggle('active', visual.shadows);
+        ui.btnShadows.textContent = visual.shadows ? '☀️ Sombras: ON' : '☀️ Sombras';
+      }
+      saveVisual();
+      if(!silent) showMsg(visual.shadows ? '☀️ Sombras activadas.' : '☀️ Sombras desactivadas.', true);
+    }
+
+    // --- Bordes (toggle) ---
+    function setEdges(on, silent=false){
+      visual.edges = !!on;
+      // edificios
+      (bldMeshes || []).forEach(m => {
+        const e = m.userData && m.userData.edgeLine;
+        if(e) e.visible = visual.edges;
+      });
+      if(ui.btnEdges){
+        ui.btnEdges.classList.toggle('active', visual.edges);
+        ui.btnEdges.textContent = visual.edges ? '🧊 Bordes: ON' : '🧊 Bordes';
+      }
+      saveVisual();
+      if(!silent) showMsg(visual.edges ? '🧊 Bordes activados.' : '🧊 Bordes desactivados.', true);
+    }
+
+    
+    // --- Modo móvil (rendimiento) ---
+    function applyMobilePerf(on, silent=false){
+      mobilePerf = !!on;
+      if(ui.btnMobile){
+        ui.btnMobile.classList.toggle('active', mobilePerf);
+        ui.btnMobile.textContent = mobilePerf ? '📱 Modo móvil: ON' : '📱 Modo móvil';
+      }
+      // Pixel ratio (lo que más ayuda en móvil)
+      renderer.setPixelRatio(Math.min(devicePixelRatio, mobilePerf ? 1.0 : 1.5));
+      // Defaults recomendados
+      if(mobilePerf){
+        setShadows(false, true);
+        setEdges(false, true);
+        setFog(false, true);
+        if(visual.bump > 0.25) setBump(0.25, true);
+      }
+      savePerf();
+      if(!silent) showMsg(mobilePerf ? '📱 Optimización móvil activada.' : '🖥️ Optimización móvil desactivada.', true);
+    }
+
+// Estado inicial botones
+    if(ui.btnShadows) setShadows(visual.shadows, true);
+    if(ui.btnEdges) setEdges(visual.edges, true);
+    // Aplica modo móvil automáticamente (si aplica)
+    applyMobilePerf(mobilePerf, true);
+
+    ui.btnShadows?.addEventListener('click', () => setShadows(!visual.shadows));
+    ui.btnEdges?.addEventListener('click', () => setEdges(!visual.edges));
+    ui.btnMobile?.addEventListener('click', () => applyMobilePerf(!mobilePerf));
+
+
+    const world = new THREE.Group(); scene.add(world);
+    const grpGround = new THREE.Group(); world.add(grpGround);
+    const grpBld = new THREE.Group(); world.add(grpBld);
+    const grpFence = new THREE.Group(); world.add(grpFence);
+    const grpCams = new THREE.Group(); world.add(grpCams);
+    const grpHelpers = new THREE.Group(); world.add(grpHelpers);
+    const grpMeasure = new THREE.Group(); world.add(grpMeasure);
+    const grpZones = new THREE.Group(); world.add(grpZones);
+
+    // Preparar texturas procedurales para dar más relieve al 3D
+    buildReliefTextures();
+    sceneReady = true;
+
+    let worldScale = 1;
+    const texLoader = new THREE.TextureLoader();
+
+    // --- Texturas (edificios / cámaras) ---
+    const texCache = new Map();
+    function safeSetColorSpace(tex){
+      try{
+        if('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+        else if('encoding' in tex) tex.encoding = THREE.sRGBEncoding;
+      }catch(e){}
+    }
+    function getTex(url){
+      if(!url) return null;
+      if(texCache.has(url)) return texCache.get(url);
+      const t = texLoader.load(url, (tex) => {
+        try{
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          safeSetColorSpace(tex);
+          try { tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), mobilePerf ? 2 : 6); } catch(e) {}
+          tex.needsUpdate = true;
+        }catch(e){}
+      });
+      try{ t.wrapS = t.wrapT = THREE.RepeatWrapping; }catch(e){}
+      texCache.set(url, t);
+      return t;
+    }
+    function applyTexRepeat(tex, repeat=1){
+      if(!tex) return;
+      const r = Math.max(0.01, Number(repeat)||1);
+      try{ tex.repeat.set(r, r); }catch(e){}
+      try{ tex.needsUpdate = true; }catch(e){}
+    }
+    function toHex(val, fallback){
+      if(val == null) return fallback;
+      if(typeof val === 'number') return '#' + val.toString(16).padStart(6,'0');
+      let s = String(val).trim();
+      if(s.startsWith('0x')) s = '#' + s.slice(2);
+      if(!s.startsWith('#') && /^[0-9a-f]{6}$/i.test(s)) s = '#' + s;
+      if(/^#([0-9a-f]{3}){1,2}$/i.test(s)) return s;
+      return fallback;
+    }
+
+
+    // --- Relieve (texturas procedurales) para que el 3D se vea menos "plano" ---
+    var noiseGroundTex = null;
+    var noiseBldTex = null;
+
+    function makeNoiseCanvas(size=256){
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d', { willReadFrequently:false });
+      const img = ctx.createImageData(size, size);
+      for(let i=0;i<img.data.length;i+=4){
+        const v = (Math.random()*255)|0;
+        img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      // Suavizado rápido (multi-escala) para evitar ruido "chillon"
+      ctx.globalAlpha = 0.25;
+      for(let k=0;k<4;k++){
+        const s = 2 ** (k+1);
+        ctx.drawImage(c, 0, 0, size/s, size/s, 0, 0, size, size);
+      }
+      ctx.globalAlpha = 1;
+      return c;
+    }
+
+    function buildReliefTextures(){
+      const canvas = makeNoiseCanvas(256);
+      noiseGroundTex = new THREE.CanvasTexture(canvas);
+      noiseBldTex = new THREE.CanvasTexture(canvas);
+
+      [noiseGroundTex, noiseBldTex].forEach(t => {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        // Para mapas de bump/roughness, mantener en espacio lineal (sin corrección gamma)
+        if(THREE.NoColorSpace) t.colorSpace = THREE.NoColorSpace;
+        t.needsUpdate = true;
+      });
+
+      noiseGroundTex.repeat.set(6, 6);
+      noiseBldTex.repeat.set(1, 1);
+    }
+
+    function applyReliefToScene(){
+      // Suelo
+      try{
+        const g = grpGround?.children?.find(o => o && o.isMesh);
+        if(g && g.material){
+          g.material.bumpScale = (visual.bump || 0) * 0.35;
+          g.material.needsUpdate = true;
+        }
+      } catch(e) {}
+      // Edificios
+      try{
+        (bldMeshes || []).forEach(m => {
+          if(m && m.material){
+            m.material.bumpScale = (visual.bump || 0) * 0.08;
+            m.material.needsUpdate = true;
+          }
+        });
+      } catch(e) {}
+    }
+
+    let groundTex = null;
+    let groundW = 200, groundH = 200;
+    let groundAspect = 1;
+
+
+    // --- EDIFICIOS EDITABLES ---
+    let bldData = [];       // [{name,type,w,d,h,x,z,color}]
+    var bldMeshes = [];     // meshes en el mundo
+
+    // Bordes para dar lectura (tipo "CAD suave") sin perder realismo
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x203044, transparent: true, opacity: 0.55 });
+
+    function ensureEdges(mesh){
+      if(!mesh) return;
+      let line = mesh.userData.edgeLine;
+      if(line){
+        line.geometry.dispose();
+        line.geometry = new THREE.EdgesGeometry(mesh.geometry, 15);
+      } else {
+        const eg = new THREE.EdgesGeometry(mesh.geometry, 15);
+        line = new THREE.LineSegments(eg, edgeMat);
+        line.visible = !!visual.edges;
+        line.renderOrder = 2;
+        mesh.add(line);
+        mesh.userData.edgeLine = line;
+      }
+    }
+
+
+    function rebuildBuildings(){
+      grpBld.clear();
+      bldMeshes = [];
+      (bldData || []).forEach((b, idx) => {
+        const m = new THREE.MeshStandardMaterial({
+          color: b.color || 0xcccccc,
+          emissive: 0x000000,
+          roughness: 0.88,
+          metalness: 0.0,
+          bumpMap: noiseBldTex,
+          bumpScale: (visual.bump || 0) * 0.08,
+          roughnessMap: noiseBldTex
+        });
+        if(b.tex){
+          const t = getTex(b.tex);
+          applyTexRepeat(t, b.texScale || 1);
+          m.map = t;
+        } else {
+          m.map = null;
+        }
+        const box = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), m);
+        box.position.set(b.x, b.h/2, b.z);
+        box.castShadow = true; box.receiveShadow = true;
+        box.userData.kind = 'building';
+        box.userData.idx = idx;
+        ensureEdges(box);
+        grpBld.add(box);
+        bldMeshes.push(box);
+      });
+    }
+
+    function setBuildingSelected(idx){
+      // quitar highlight previo
+      bldMeshes.forEach(m => { if(m.material && m.material.emissive) m.material.emissive.set(0x000000); });
+      if(idx == null || idx < 0 || idx >= bldMeshes.length){ syncStyleUI(); return; }
+      const m = bldMeshes[idx];
+      if(m.material && m.material.emissive) m.material.emissive.set(0x3355ff);
+      syncStyleUI();
+    }
+
+    function applyBldControlsFromSelected(idx){
+      if(idx == null || idx < 0 || idx >= (bldData||[]).length) return;
+      const b = bldData[idx];
+      ui.rngBW.value = b.w; ui.rngBD.value = b.d; ui.rngBH.value = b.h;
+      ui.valBW.textContent = String(Math.round(b.w));
+      ui.valBD.textContent = String(Math.round(b.d));
+      ui.valBH.textContent = Number(b.h).toFixed(1);
+    }
+
+    function updateSelectedBuildingDims(){
+      if(selected.kind !== 'building') return;
+      const idx = selected.idx;
+      if(idx == null || idx < 0 || idx >= bldMeshes.length) return;
+      const w = parseFloat(ui.rngBW.value);
+      const d = parseFloat(ui.rngBD.value);
+      const h = parseFloat(ui.rngBH.value);
+      ui.valBW.textContent = String(Math.round(w));
+      ui.valBD.textContent = String(Math.round(d));
+      ui.valBH.textContent = h.toFixed(1);
+      const b = bldData[idx];
+      b.w = w; b.d = d; b.h = h;
+      const m = bldMeshes[idx];
+      m.geometry.dispose();
+      m.geometry = new THREE.BoxGeometry(w, h, d);
+      m.position.y = h/2;
+      ensureEdges(m);
+      saveLocal();
+    }
+
+    ui.rngBW.addEventListener('input', updateSelectedBuildingDims);
+    ui.rngBD.addEventListener('input', updateSelectedBuildingDims);
+    ui.rngBH.addEventListener('input', updateSelectedBuildingDims);
+
+    // --- CÁMARAS EDITABLES ---
+    let camRoots = []; // root groups por cámara (para selección/drag)
+
+    function setCameraSelected(idx){
+      camRoots.forEach(g => {
+        const head = g.userData.headMesh;
+        if(head && head.material && head.material.emissive) head.material.emissive.set(0x000000);
+      });
+      if(idx == null || idx < 0 || idx >= camRoots.length){ syncStyleUI(); return; }
+      const g = camRoots[idx];
+      const head = g.userData.headMesh;
+      if(head && head.material && head.material.emissive) head.material.emissive.set(0x3355ff);
+      syncStyleUI();
+    }
+    
+    
+    function buildGround(tex = null){
+      grpGround.clear();
+      if(tex) groundTex = tex;
+      groundAspect = (groundTex && groundTex.image) ? (groundTex.image.width / groundTex.image.height) : 1;
+      const mat = new THREE.MeshStandardMaterial({
+        color: tex ? 0xffffff : 0x222222,
+        map: tex,
+        roughness: 0.85,
+        metalness: 0.0,
+        bumpMap: noiseGroundTex,
+        bumpScale: (visual.bump || 0) * 0.35,
+        roughnessMap: noiseGroundTex
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(groundW, groundH), mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.receiveShadow = true;
+      grpGround.add(mesh);
+
+      const grid = new THREE.GridHelper(Math.max(groundW, groundH), 50, 0x555555, 0x222222);
+      grid.position.y = 0.05;
+      grid.material.transparent = true;
+      grid.material.opacity = 0.3;
+      grpGround.add(grid);
+    }
+
+    function fitGroundToPerimeter(pad=1.05){
+      const pts = state.perimeterPts || [];
+      if(!pts || pts.length < 2 || !groundTex || !groundTex.image) return;
+      let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+      for(const p of pts){
+        if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+        if(p.z<minZ) minZ=p.z; if(p.z>maxZ) maxZ=p.z;
+      }
+      const bx=(minX+maxX)/2;
+      const bz=(minZ+maxZ)/2;
+      let w=(maxX-minX)*pad;
+      let h=(maxZ-minZ)*pad;
+      if(w<1) w=1; if(h<1) h=1;
+      const imgAspect = groundTex.image.width / groundTex.image.height;
+      // Mantener proporción de la imagen y cubrir el perímetro
+      if((w/h) > imgAspect){
+        groundW = w;
+        groundH = w / imgAspect;
+      } else {
+        groundH = h;
+        groundW = h * imgAspect;
+      }
+      buildGround(groundTex);
+      // Centrar el suelo en el perímetro
+      const m = grpGround.children.find(o => o.isMesh);
+      if(m){ m.position.set(bx, 0, bz); }
+      // Recentrar la cámara al área
+      controls.target.set(bx, 0, bz);
+      controls.update();
+      resetView();
+    }
+
+    // --- ZONAS (overlay superior) ---
+    function drawZones(zones){
+      grpZones.clear();
+      if(!zones || !zones.length) return;
+
+      zones.forEach(z => {
+        const poly = z.polygon || [];
+        if(poly.length < 3) return;
+
+        const shape = new THREE.Shape();
+        shape.moveTo(poly[0].x, poly[0].z);
+        for(let i=1;i<poly.length;i++){
+          shape.lineTo(poly[i].x, poly[i].z);
+        }
+        shape.lineTo(poly[0].x, poly[0].z);
+
+        const geom = new THREE.ShapeGeometry(shape);
+        geom.rotateX(-Math.PI/2);
+
+        const mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(z.color || '#ffffff'),
+          transparent: true,
+          opacity: (z.opacity ?? 0.22),
+          depthWrite: false
+        });
+
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.y = 0.08;
+        grpZones.add(mesh);
+
+        const pts2 = poly.map(p => new THREE.Vector3(p.x, 0.09, p.z));
+        pts2.push(new THREE.Vector3(poly[0].x, 0.09, poly[0].z));
+        const lineGeom = new THREE.BufferGeometry().setFromPoints(pts2);
+        const lineMat = new THREE.LineBasicMaterial({ color: new THREE.Color(z.color || '#ffffff'), transparent:true, opacity:0.9 });
+        const line = new THREE.Line(lineGeom, lineMat);
+        grpZones.add(line);
+      });
+    }
+
+    texLoader.load('./ground.jpg', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      try { tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), mobilePerf ? 2 : 8); } catch(e) {}
+      // Tamaño inicial del suelo según la proporción de la imagen
+      groundTex = tex;
+      groundW = 200;
+      groundH = groundW * (tex.image.height / tex.image.width);
+      buildGround(tex);
+      // Si ya hay perímetro cargado (LocalStorage/import), ajusta el suelo automáticamente
+      fitGroundToPerimeter();
+      resetView();
+    }, undefined, () => buildGround(null));
+
+    fetch('./scene.json').then(r=>r.json()).then(data => {
+      if(data.buildings){
+        bldData = data.buildings.map(b => ({...b}));
+        rebuildBuildings();
+      }
+      if(data.zonesRect){
+        data.zonesRect.forEach(z => {
+          const g = new THREE.PlaneGeometry(z.w, z.d);
+          const m = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(z.color || "#ffffff"),
+            transparent: true,
+            opacity: (z.opacity ?? 0.22),
+            depthWrite: false
+          });
+          const p = new THREE.Mesh(g, m);
+          p.rotation.x = -Math.PI/2;
+          p.position.set(z.x, 0.08, z.z);
+          grpZones.add(p);
+        });
+      }
+
+    }).catch(() => console.log("Sin scene.json, modo vacío."));
+
+    let mode = 'nav'; 
+    const state = { perimeterPts: [], cameras: [] };
+
+    // --- Área (polígono) ---
+    let areaPts = [];
+    let areaClosed = false;
+    let areaPreviewLine = null;
+    let areaOutlineLine = null;
+    let areaFillMesh = null;
+
+    const selected = { kind: null, idx: null };
+
+    function showStyle(which){
+      if(!ui.styleNone) return;
+      ui.styleNone.style.display = (!which) ? '' : 'none';
+      ui.styleBld.style.display = (which === 'building') ? '' : 'none';
+      ui.styleCam.style.display = (which === 'camera') ? '' : 'none';
+    }
+
+    function syncStyleUI(){
+      if(!ui.styleNone) return;
+
+      const canEditBld = (mode === 'bldedit' && selected.kind === 'building' && selected.idx != null && !allLocked);
+      const canEditCam = (mode === 'camedit' && selected.kind === 'camera' && selected.idx != null && !allLocked);
+
+      if(selected.kind === 'building' && selected.idx != null){
+        const b = (bldData || [])[selected.idx];
+        showStyle('building');
+        ui.styleBldName.textContent = (b && b.name) ? b.name : `Edificio ${selected.idx+1}`;
+        ui.bldColor.value = toHex(b && b.color, '#dfe6ea');
+        ui.bldTex.value = (b && b.tex) ? b.tex : '';
+        const s = (b && b.texScale) ? b.texScale : 1;
+        ui.bldTexScale.value = s;
+        ui.valBldTexScale.textContent = Number(s).toFixed(2);
+      } else if(selected.kind === 'camera' && selected.idx != null){
+        const c = (state.cameras || [])[selected.idx];
+        showStyle('camera');
+        ui.styleCamId.textContent = (c && c.id) ? c.id : `C-${String(selected.idx+1).padStart(2,'0')}`;
+        ui.camBodyColor.value = toHex(c && c.color, '#ff3333');
+        ui.camPoleColor.value = toHex(c && c.poleColor, '#2a2a2a');
+        ui.camConeColor.value = toHex(c && c.coneColor, '#00ff66');
+        ui.camTex.value = (c && c.tex) ? c.tex : '';
+        const s = (c && c.texScale) ? c.texScale : 1;
+        ui.camTexScale.value = s;
+        ui.valCamTexScale.textContent = Number(s).toFixed(2);
+      } else {
+        showStyle(null);
+      }
+
+      // habilitar / deshabilitar inputs según modo
+      const setDisabled = (rootEl, disabled) => {
+        if(!rootEl) return;
+        rootEl.querySelectorAll('input,select').forEach(el => { el.disabled = !!disabled; });
+      };
+      setDisabled(ui.styleBld, !canEditBld);
+      setDisabled(ui.styleCam, !canEditCam);
+    }
+
+    function applyBuildingStyleFromUI(){
+      if(selected.kind !== 'building' || selected.idx == null) return;
+      const idx = selected.idx;
+      const b = (bldData || [])[idx];
+      if(!b) return;
+      b.color = ui.bldColor.value;
+      b.tex = ui.bldTex.value || '';
+      b.texScale = parseFloat(ui.bldTexScale.value) || 1;
+      ui.valBldTexScale.textContent = Number(b.texScale).toFixed(2);
+      rebuildBuildings();
+      setBuildingSelected(idx);
+      syncStyleUI();
+      saveLocal();
+    }
+
+    function applyCameraStyleFromUI(){
+      if(selected.kind !== 'camera' || selected.idx == null) return;
+      const idx = selected.idx;
+      const c = (state.cameras || [])[idx];
+      if(!c) return;
+      c.color = ui.camBodyColor.value;
+      c.poleColor = ui.camPoleColor.value;
+      c.coneColor = ui.camConeColor.value;
+      c.tex = ui.camTex.value || '';
+      c.texScale = parseFloat(ui.camTexScale.value) || 1;
+      ui.valCamTexScale.textContent = Number(c.texScale).toFixed(2);
+      renderCameras();
+      setCameraSelected(idx);
+      syncStyleUI();
+      saveLocal();
+    }
+
+
+    const layers = { cams: true, cones: true, labels: true };
+    let camPlan = [];
+    let planCurrentId = null;
+
+    // Estado inicial de botones de capas + carga del plan (camera_plan.json)
+    setLayerBtn(ui.btnLayerCams, layers.cams);
+    setLayerBtn(ui.btnLayerCones, layers.cones);
+    setLayerBtn(ui.btnLayerLabels, layers.labels);
+    refreshPlanUI();
+    loadPlan();
+
+    let isDragging = false;
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+
+    function setMode(m){
+      mode = m;
+      ui.btnCam.classList.toggle('active', mode === 'cam');
+      ui.btnPer.classList.toggle('active', mode === 'per');
+      ui.btnScale.classList.toggle('active', mode === 'scale');
+      ui.btnEditBld.classList.toggle('active', mode === 'bldedit');
+      ui.btnEditCam.classList.toggle('active', mode === 'camedit');
+      ui.btnMeasure.classList.toggle('active', mode === 'measure');
+      ui.btnArea.classList.toggle('active', mode === 'area');
+
+      // Cerrar área solo tiene sentido en modo área y con 3+ puntos
+      if(ui.btnCloseArea){
+        const canClose = (mode === 'area' && areaPts && areaPts.length >= 3 && !areaClosed);
+        ui.btnCloseArea.disabled = !canClose;
+      }
+
+      const camActive = (mode === 'cam' || mode === 'camedit');
+      ui.camControls.style.opacity = camActive ? '1' : '0.3';
+      ui.camControls.style.pointerEvents = camActive ? 'auto' : 'none';
+
+      const bldActive = (mode === 'bldedit');
+      ui.bldControls.style.opacity = bldActive ? '1' : '0.3';
+      ui.bldControls.style.pointerEvents = bldActive ? 'auto' : 'none';
+
+      if(mode === 'scale') showMsg("📏 Click en Punto A y luego Punto B para calibrar.", false);
+      if(mode === 'bldedit') showMsg("🏢 Editar: click para seleccionar. Arrastra para mover. Usa sliders para tamaño.", false);
+      if(mode === 'camedit') showMsg("📹 Editar: click para seleccionar. Arrastra para mover. Usa sliders para ajustar.", false);
+      if(mode === 'measure') showMsg("📐 Medir distancia: click en Punto A y luego Punto B.", false);
+      if(mode === 'area') showMsg("🔳 Medir área: agrega puntos con click. Luego usa ✅ Cerrar Área.", false);
+      syncStyleUI();
+    }
+
+    let scaleStep = 0, pA = null;
+    function handleScaleClick(pt){
+      if(scaleStep === 0){
+        pA = pt.clone();
+        scaleStep = 1;
+        showMsg("📏 Punto A fijado. Ahora click en Punto B.", false);
+      } else {
+        const dist3D = pA.distanceTo(pt);
+        const realStr = prompt(`Distancia 3D actual: ${dist3D.toFixed(2)} unidades.\n¿Cuántos METROS reales son?`, "100");
+        const real = parseFloat(realStr);
+        if(real > 0){
+          const factor = real / dist3D;
+          setWorldScale(worldScale * factor);
+          showMsg(`✅ Calibrado. Factor aplicado: ${factor.toFixed(4)}`, true);
+        }
+        setMode('nav');
+        scaleStep = 0; pA = null;
+      }
+    }
+
+    function setWorldScale(s){
+      worldScale = s;
+      world.scale.setScalar(worldScale);
+      ui.scalePill.textContent = (worldScale===1) ? "Sin Calibrar" : "Calibrado (1u = " + (1/s).toFixed(2) +"m)";
+      saveLocal();
+    }
+
+
+// --- MEDICIÓN (Regla) ---
+let measureStep = 0;
+let measureA = null; // punto A en coordenadas LOCALES (world local)
+let measurePreviewLine = null;
+
+function fmtDistance(d){
+  const calibrated = Math.abs(worldScale - 1) > 1e-6;
+  return calibrated ? `${d.toFixed(2)} m` : `${d.toFixed(2)} u (calibra para metros)`;
+}
+
+function setMeasureInfo(txt){
+  if(ui.measureInfo) ui.measureInfo.textContent = txt || '';
+}
+
+function clearMeasure(silent=false){
+  measureStep = 0;
+  measureA = null;
+  grpMeasure.clear();
+  measurePreviewLine = null;
+
+  // Limpia también el modo Área
+  areaPts = [];
+  areaClosed = false;
+  if(areaPreviewLine){
+    try { areaPreviewLine.geometry.dispose(); } catch(e){}
+    try { areaPreviewLine.material.dispose(); } catch(e){}
+  }
+  areaPreviewLine = null;
+  areaOutlineLine = null;
+  areaFillMesh = null;
+  if(ui.btnCloseArea) ui.btnCloseArea.disabled = true;
+
+  setMeasureInfo('');
+  if(!silent) showMsg('🧽 Medición limpiada.', true);
+}
+
+function addMeasureDot(localPos, colorHex){
+  const g = new THREE.SphereGeometry(0.45, 10, 10);
+  const m = new THREE.MeshBasicMaterial({ color: colorHex });
+  const s = new THREE.Mesh(g, m);
+  s.position.copy(localPos);
+  s.position.y = 0.25;
+  grpMeasure.add(s);
+  return s;
+}
+
+function makeMeasureLine(aLocal, bLocal, isPreview=false){
+  const pts = [
+    new THREE.Vector3(aLocal.x, 0.15, aLocal.z),
+    new THREE.Vector3(bLocal.x, 0.15, bLocal.z)
+  ];
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({
+    color: isPreview ? 0xffffff : 0x88aaff,
+    transparent: true,
+    opacity: isPreview ? 0.55 : 0.95
+  });
+  return new THREE.Line(geom, mat);
+}
+
+function updateMeasurePreview(worldPt){
+  if(mode !== 'measure') return;
+  if(measureStep !== 1 || !measureA) return;
+
+  const bLocal = world.worldToLocal(worldPt.clone());
+  const dist = measureA.distanceTo(bLocal) * worldScale;
+  setMeasureInfo(`Distancia: ${fmtDistance(dist)}`);
+
+  if(measurePreviewLine){
+    grpMeasure.remove(measurePreviewLine);
+    try { measurePreviewLine.geometry.dispose(); } catch(e){}
+    try { measurePreviewLine.material.dispose(); } catch(e){}
+    measurePreviewLine = null;
+  }
+  measurePreviewLine = makeMeasureLine(measureA, bLocal, true);
+  grpMeasure.add(measurePreviewLine);
+}
+
+function handleMeasureClick(worldPt){
+  const ptLocal = world.worldToLocal(worldPt.clone());
+
+  if(measureStep === 0){
+    clearMeasure(true); // limpia medición previa para evitar desorden
+    measureA = ptLocal.clone();
+    measureStep = 1;
+    addMeasureDot(measureA, 0x00ff88); // A
+    setMeasureInfo('Punto A listo… ahora elige Punto B');
+    showMsg('📐 Punto A fijado. Ahora click en Punto B.', false);
+    return;
+  }
+
+  const bLocal = ptLocal.clone();
+  addMeasureDot(bLocal, 0xffdd55); // B
+
+  if(measurePreviewLine){
+    grpMeasure.remove(measurePreviewLine);
+    try { measurePreviewLine.geometry.dispose(); } catch(e){}
+    try { measurePreviewLine.material.dispose(); } catch(e){}
+    measurePreviewLine = null;
+  }
+
+  const finalLine = makeMeasureLine(measureA, bLocal, false);
+  grpMeasure.add(finalLine);
+
+  const dist = measureA.distanceTo(bLocal) * worldScale;
+  const txt = `Distancia: ${fmtDistance(dist)}`;
+  setMeasureInfo(txt);
+  showMsg('📐 ' + txt, true);
+
+  measureStep = 0;
+  measureA = null;
+}
+
+
+// --- MEDICIÓN (Área) ---
+function fmtArea(a){
+  const calibrated = Math.abs(worldScale - 1) > 1e-6;
+  return calibrated ? `${a.toFixed(2)} m²` : `${a.toFixed(2)} u² (calibra para m²)`;
+}
+
+function polyArea2D(pts){
+  if(!pts || pts.length < 3) return 0;
+  let sum = 0;
+  for(let i=0;i<pts.length;i++){
+    const j = (i+1) % pts.length;
+    sum += (pts[i].x * pts[j].z) - (pts[j].x * pts[i].z);
+  }
+  return Math.abs(sum) / 2;
+}
+
+function areaCanClose(){
+  return (mode === 'area' && areaPts.length >= 3 && !areaClosed);
+}
+
+function syncAreaCloseBtn(){
+  if(ui.btnCloseArea) ui.btnCloseArea.disabled = !areaCanClose();
+}
+
+function makeAreaSeg(aLocal, bLocal, isPreview=false){
+  const pts = [
+    new THREE.Vector3(aLocal.x, 0.16, aLocal.z),
+    new THREE.Vector3(bLocal.x, 0.16, bLocal.z)
+  ];
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({
+    color: isPreview ? 0xffffff : 0x55ddff,
+    transparent: true,
+    opacity: isPreview ? 0.5 : 0.95
+  });
+  return new THREE.Line(geom, mat);
+}
+
+function addAreaDot(localPos, isFirst=false){
+  const g = new THREE.SphereGeometry(0.45, 10, 10);
+  const m = new THREE.MeshBasicMaterial({ color: isFirst ? 0x00ff88 : 0x55ddff });
+  const s = new THREE.Mesh(g, m);
+  s.position.copy(localPos);
+  s.position.y = 0.26;
+  grpMeasure.add(s);
+  return s;
+}
+
+function redrawAreaBase(){
+  // Redibuja puntos + segmentos ya fijados (sin cerrar)
+  grpMeasure.clear();
+  areaPreviewLine = null;
+
+  for(let i=0;i<areaPts.length;i++){
+    addAreaDot(areaPts[i], i===0);
+    if(i>0){
+      grpMeasure.add(makeAreaSeg(areaPts[i-1], areaPts[i], false));
+    }
+  }
+}
+
+function updateAreaInfo(previewLocal=null){
+  if(mode !== 'area') return;
+  const n = areaPts.length;
+  if(areaClosed){
+    const a = polyArea2D(areaPts) * (worldScale*worldScale);
+    setMeasureInfo(`Área: ${fmtArea(a)}  |  Puntos: ${n}`);
+    return;
+  }
+
+  if(n === 0){
+    setMeasureInfo('Click para agregar puntos de área…');
+    return;
+  }
+
+  if(n >= 2 && previewLocal){
+    const tmp = areaPts.concat([previewLocal]);
+    const a = polyArea2D(tmp) * (worldScale*worldScale);
+    setMeasureInfo(`Área (preview): ${fmtArea(a)}  |  Puntos: ${n+1} (click para fijar)`);
+  } else {
+    setMeasureInfo(`Puntos: ${n} (agrega más puntos y luego ✅ Cerrar Área)`);
+  }
+}
+
+function updateAreaPreview(worldPt){
+  if(mode !== 'area') return;
+  if(areaClosed) return;
+  if(areaPts.length === 0) return;
+
+  const curLocal = world.worldToLocal(worldPt.clone());
+  updateAreaInfo(curLocal);
+
+  if(areaPreviewLine){
+    grpMeasure.remove(areaPreviewLine);
+    try { areaPreviewLine.geometry.dispose(); } catch(e){}
+    try { areaPreviewLine.material.dispose(); } catch(e){}
+    areaPreviewLine = null;
+  }
+  areaPreviewLine = makeAreaSeg(areaPts[areaPts.length-1], curLocal, true);
+  grpMeasure.add(areaPreviewLine);
+}
+
+function handleAreaClick(worldPt){
+  const ptLocal = world.worldToLocal(worldPt.clone());
+
+  // Si ya estaba cerrado, comenzar uno nuevo automáticamente
+  if(areaClosed){
+    clearMeasure(true);
+    setMode('area');
+  }
+
+  // Primer punto: limpia mediciones previas para evitar mezcla visual
+  if(areaPts.length === 0){
+    clearMeasure(true);
+    setMode('area');
+  }
+
+  areaPts.push(ptLocal.clone());
+  redrawAreaBase();
+  syncAreaCloseBtn();
+  updateAreaInfo();
+  showMsg(`🔳 Punto agregado (${areaPts.length}). ${areaPts.length>=3 ? 'Ya puedes cerrar el área ✅.' : 'Agrega más puntos…'}`, false);
+}
+
+function closeArea(){
+  if(areaPts.length < 3) return;
+  areaClosed = true;
+
+  // Redibuja limpio con relleno + contorno
+  grpMeasure.clear();
+  areaPreviewLine = null;
+
+  // Relleno
+  const shape = new THREE.Shape();
+  shape.moveTo(areaPts[0].x, areaPts[0].z);
+  for(let i=1;i<areaPts.length;i++) shape.lineTo(areaPts[i].x, areaPts[i].z);
+  shape.closePath();
+
+  const geom = new THREE.ShapeGeometry(shape);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x55ddff,
+    transparent: true,
+    opacity: 0.18,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  areaFillMesh = new THREE.Mesh(geom, mat);
+  areaFillMesh.rotation.x = -Math.PI/2;
+  areaFillMesh.position.y = 0.08;
+  grpMeasure.add(areaFillMesh);
+
+  // Contorno (LineLoop)
+  const loopPts = areaPts.map(p => new THREE.Vector3(p.x, 0.17, p.z));
+  const loopGeom = new THREE.BufferGeometry().setFromPoints(loopPts);
+  const loopMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent:true, opacity:0.85 });
+  areaOutlineLine = new THREE.LineLoop(loopGeom, loopMat);
+  grpMeasure.add(areaOutlineLine);
+
+  // Puntos encima
+  for(let i=0;i<areaPts.length;i++) addAreaDot(areaPts[i], i===0);
+
+  syncAreaCloseBtn();
+
+  const a = polyArea2D(areaPts) * (worldScale*worldScale);
+  const txt = `Área: ${fmtArea(a)}`;
+  setMeasureInfo(txt + `  |  Puntos: ${areaPts.length}`);
+  showMsg('🔳 ' + txt, true);
+}
+
+
+    function addPerimeterPt(pt){
+      const localPt = world.worldToLocal(pt.clone());
+      state.perimeterPts.push(localPt);
+      drawPerimeter();
+      saveLocal();
+    }
+
+    function undoPerimeter(){
+      if(state.perimeterPts.length > 0){
+        state.perimeterPts.pop();
+        drawPerimeter();
+        saveLocal();
+        showMsg("Deshecho último punto", false);
+      }
+    }
+
+    function drawPerimeter(){
+      grpHelpers.clear();
+      grpFence.clear();
+      const dotGeom = new THREE.SphereGeometry(0.4, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      state.perimeterPts.forEach(p => {
+        const d = new THREE.Mesh(dotGeom, dotMat);
+        d.position.copy(p);
+        d.position.y = 0.2;
+        grpHelpers.add(d);
+      });
+      if(state.perimeterPts.length > 1){
+        const pts = [...state.perimeterPts];
+        const geom = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0xffff00 }));
+        grpHelpers.add(line);
+      }
+    }
+
+    function generateFence(){
+      if(state.perimeterPts.length < 3) return showMsg("⚠️ Mínimo 3 puntos para cerrar.", false);
+      grpFence.clear();
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness:0.9 });
+      const pts = state.perimeterPts;
+      for(let i=0; i<pts.length; i++){
+        const curr = pts[i];
+        const next = pts[(i+1) % pts.length];
+        const vec = new THREE.Vector3().subVectors(next, curr);
+        const len = vec.length();
+        const angle = Math.atan2(vec.x, vec.z);
+        const h = 2.5; 
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, len), wallMat);
+        wall.position.set((curr.x+next.x)/2, h/2, (curr.z+next.z)/2);
+        wall.rotation.y = angle;
+        wall.castShadow = true;
+        grpFence.add(wall);
+      }
+      showMsg("✅ Valla generada.", true);
+    }
+
+    function addCamera(pt){
+      const localPt = world.worldToLocal(pt.clone());
+
+      let usePlan = null;
+      if(planCurrentId){
+        const p = camPlan.find(x => x.id === planCurrentId);
+        if(p && !p.placed) usePlan = p;
+      }
+
+      const genId = `C-${String((state.cameras||[]).length + 1).padStart(2,'0')}`;
+      const camId = (usePlan && usePlan.id) ? usePlan.id : genId;
+      const camZone = (usePlan && usePlan.zone) ? usePlan.zone : '';
+
+      const cData = {
+        id: camId,
+        zone: camZone,
+        x: localPt.x, z: localPt.z,
+        h: camSettings.h, angle: camSettings.angle, dist: camSettings.dist, yaw: 0
+      };
+
+      const lookAt = new THREE.Vector3(0,0,0);
+      const dir = new THREE.Vector3().subVectors(lookAt, localPt).normalize();
+      cData.yaw = Math.atan2(dir.x, dir.z);
+
+      state.cameras.push(cData);
+
+      if(usePlan){
+        usePlan.placed = true;
+        setPlanCurrent(getNextUnplaced(usePlan.id));
+        refreshPlanUI();
+        showMsg(`📌 Colocada ${camId}`, true);
+      }
+
+      renderCameras();
+      saveLocal();
+    }
+
+    
+    function setLayerBtn(btn, on){
+      if(!btn) return;
+      btn.classList.toggle('success', !!on);
+      btn.classList.toggle('off', !on);
+    }
+
+    function applyLayers(){
+      if(typeof grpCams !== 'undefined') grpCams.visible = !!layers.cams;
+      (camRoots || []).forEach(r => {
+        if(r && r.userData){
+          if(r.userData.coneMesh) r.userData.coneMesh.visible = !!layers.cones;
+          if(r.userData.labelSprite) r.userData.labelSprite.visible = !!layers.labels;
+        }
+      });
+    }
+
+    function makeLabelSprite(text){
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const fontPx = 44;
+      ctx.font = `700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      const padX = 18, padY = 12;
+      const w = Math.ceil(ctx.measureText(text).width + padX*2);
+      const h = fontPx + padY*2;
+      canvas.width = w; canvas.height = h;
+
+      ctx.font = `700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillText(text, padX, fontPx + padY - 4);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const spr = new THREE.Sprite(mat);
+      const s = 1.9; // tamaño base
+      spr.scale.set((w / h) * s, s, 1);
+      return spr;
+    }
+
+    function reconcilePlanWithPlaced(){
+      const placed = new Set((state.cameras||[]).map(c => c.id).filter(Boolean));
+      camPlan.forEach(p => { p.placed = placed.has(p.id); });
+    }
+
+    function refreshPlanUI(){
+      if(!ui.planSelect || !ui.planInfo) return;
+      const total = camPlan.length || 0;
+      const unplaced = camPlan.filter(p => !p.placed);
+      ui.planSelect.innerHTML = '';
+      unplaced.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.id}${p.zone ? ' — ' + p.zone : ''}`;
+        ui.planSelect.appendChild(opt);
+      });
+
+      // resumen por zona
+      const byZone = {};
+      unplaced.forEach(p => {
+        const z = p.zone || 'Sin zona';
+        byZone[z] = (byZone[z] || 0) + 1;
+      });
+      const zoneTxt = Object.entries(byZone).map(([z,n]) => `${z}: ${n}`).join(' | ');
+
+      ui.planInfo.textContent = total
+        ? `Plan: ${total} | Restantes: ${unplaced.length}${zoneTxt ? ' | ' + zoneTxt : ''}`
+        : 'Plan: (vacío)';
+
+      if(planCurrentId && !unplaced.find(p => p.id === planCurrentId)) {
+        planCurrentId = unplaced[0]?.id || null;
+      }
+      if(planCurrentId && ui.planSelect.value !== planCurrentId) ui.planSelect.value = planCurrentId;
+      if(!planCurrentId) planCurrentId = unplaced[0]?.id || null;
+      if(planCurrentId) ui.planSelect.value = planCurrentId;
+    }
+
+    function setPlanCurrent(id){
+      planCurrentId = id || null;
+      if(ui.planSelect && planCurrentId) ui.planSelect.value = planCurrentId;
+    }
+
+    function getNextUnplaced(afterId){
+      const unplaced = camPlan.filter(p => !p.placed);
+      if(!unplaced.length) return null;
+      if(!afterId) return unplaced[0].id;
+      const i = unplaced.findIndex(p => p.id === afterId);
+      return unplaced[(i + 1 + unplaced.length) % unplaced.length].id;
+    }
+
+    async function loadPlan(){
+      try{
+        const r = await fetch('./camera_plan.json', { cache: 'no-store' });
+        if(!r.ok) throw new Error('No encontrado');
+        const data = await r.json();
+        camPlan = (data.cameras || data || []).map(o => ({...o}));
+        reconcilePlanWithPlaced();
+        // si no hay current, toma el primero libre
+        planCurrentId = getNextUnplaced(planCurrentId);
+        refreshPlanUI();
+      } catch(e){
+        camPlan = [];
+        if(ui.planInfo) ui.planInfo.textContent = 'Plan: no encontrado (camera_plan.json).';
+        if(ui.planSelect) ui.planSelect.innerHTML = '';
+      }
+    }
+
+
+    function renderCameras(){
+      grpCams.clear();
+      camRoots = [];
+      (state.cameras || []).forEach((c, idx) => {
+        const root = new THREE.Group();
+        root.position.set(c.x, 0, c.z);
+        root.userData.kind = 'camera';
+        root.userData.idx = idx;
+
+        // Poste
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.10, 0.10, c.h),
+          new THREE.MeshStandardMaterial({color: (c.poleColor || '#2a2a2a')})
+        );
+        pole.position.set(0, c.h/2, 0);
+        root.add(pole);
+        root.userData.poleMesh = pole;
+
+        // Gimbal
+        const gimbal = new THREE.Group();
+        gimbal.position.set(0, c.h, 0);
+        gimbal.rotation.y = c.yaw;
+        gimbal.rotateX(THREE.MathUtils.degToRad(c.angle));
+        root.add(gimbal);
+
+        // Cono de visión
+        const coneGeom = new THREE.ConeGeometry(Math.tan(THREE.MathUtils.degToRad(30)) * c.dist, c.dist, 32, 1, true);
+        const coneMat = new THREE.MeshBasicMaterial({ color: (c.coneColor || '#00ff66'), transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
+        const cone = new THREE.Mesh(coneGeom, coneMat);
+        cone.geometry.translate(0, -c.dist/2, 0);
+        cone.geometry.rotateX(-Math.PI/2);
+        gimbal.add(cone);
+        root.userData.coneMesh = cone;
+        cone.visible = !!layers.cones;
+
+        // Cabeza de cámara
+        const headMap = c.tex ? getTex(c.tex) : null;
+        if(headMap) applyTexRepeat(headMap, c.texScale || 1);
+        const headMat = new THREE.MeshStandardMaterial({
+          color: (c.color || '#ff3333'),
+          emissive: 0x000000,
+          roughness: 0.65,
+          metalness: 0.05,
+          map: headMap
+        });
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.28, 0.60), headMat);
+        head.position.set(0, 0.15, 0.35);
+        gimbal.add(head);
+        root.userData.headMesh = head;
+
+        // Etiqueta (ID)
+        const labelTxt = c.id || (`C-${String(idx+1).padStart(2,'0')}`);
+        if(!c.id) c.id = labelTxt;
+        const spr = makeLabelSprite(labelTxt);
+        spr.position.set(0, c.h + 0.9, 0);
+        spr.visible = !!layers.labels;
+        root.add(spr);
+        root.userData.labelSprite = spr;
+
+        grpCams.add(root);
+        camRoots.push(root);
+      });
+         applyLayers();
+    }
+
+
+    
+    const AUTOSAVE_KEY = 'cctv_v6_autosave';
+    const AUTOSAVE_FALLBACK_KEYS = ['cctv_v5_autosave', 'cctv_autosave'];
+
+    function setAutoStatus(ok, errMsg=null){
+      if(!ui.autoStatus) return;
+      const t = new Date();
+      const hh = String(t.getHours()).padStart(2,'0');
+      const mm = String(t.getMinutes()).padStart(2,'0');
+      const ss = String(t.getSeconds()).padStart(2,'0');
+      if(ok){
+        ui.autoStatus.textContent = `Auto-guardado: ✅ ${hh}:${mm}:${ss}`;
+        ui.autoStatus.style.color = '#7CFF9A';
+      } else {
+        ui.autoStatus.textContent = `Auto-guardado: ❌ bloqueado (${errMsg || 'navegador'})`;
+        ui.autoStatus.style.color = '#ff6b6b';
+      }
+    }
+
+    function saveLocal(){
+      const data = { v: 6, scale: worldScale, lock: viewLocked, per: state.perimeterPts.map(p => ({x:p.x, z:p.z})), cams: state.cameras, bld: bldData };
+      try{
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+        setAutoStatus(true);
+      } catch(e){
+        setAutoStatus(false, 'LocalStorage');
+      }
+      ui.out.value = JSON.stringify(data, null, 2);
+    }
+
+    function loadLocal(){
+      let raw = null;
+      try{
+        raw = localStorage.getItem(AUTOSAVE_KEY);
+        if(!raw){
+          for(const k of AUTOSAVE_FALLBACK_KEYS){
+            raw = localStorage.getItem(k);
+            if(raw) break;
+          }
+        }
+      } catch(e){}
+      if(raw) importJSON(raw, true);
+    }
+
+    function importJSON(jsonStr, silent=false){
+      try{
+        const d = JSON.parse(jsonStr);
+        if(typeof d.lock !== 'undefined') setViewLocked(!!d.lock, true);
+        if(d.scale) setWorldScale(d.scale);
+        if(d.per){
+          state.perimeterPts = d.per.map(p => new THREE.Vector3(p.x, 0, p.z));
+          drawPerimeter();
+          fitGroundToPerimeter();
+          if(state.perimeterPts.length > 2) generateFence();
+        }
+        if(d.bld || d.buildings){
+          bldData = (d.bld || d.buildings).map(b => ({...b}));
+          rebuildBuildings();
+        }
+        if(d.cams){
+          state.cameras = d.cams;
+          renderCameras();
+          if(camPlan.length){
+            reconcilePlanWithPlaced();
+            planCurrentId = getNextUnplaced(planCurrentId);
+            refreshPlanUI();
+          }
+        }
+        if(!silent) showMsg("✅ Datos cargados correctamente.", true);
+      } catch(e){
+        if(!silent) showMsg("❌ JSON inválido.", false);
+      }
+    }
+
+    ui.btnReset.onclick = resetView;
+    ui.btnScale.onclick = () => setMode('scale');
+    ui.btnToggleBld.onclick = () => { grpBld.visible = !grpBld.visible; };
+    ui.btnLockView.onclick = () => setViewLocked(!viewLocked);
+    ui.btnLockAll.onclick = () => setAllLocked(!allLocked);
+    ui.btnMeasure.onclick = () => { setMode(mode==='measure' ? 'nav' : 'measure'); };
+    ui.btnArea.onclick = () => {
+      const next = (mode==='area' ? 'nav' : 'area');
+      setMode(next);
+      if(next === 'area') updateAreaInfo();
+      syncAreaCloseBtn();
+    };
+    ui.btnCloseArea.onclick = () => closeArea();
+    ui.btnClearMeasure.onclick = () => clearMeasure(false);
+    ui.btnEditBld.onclick = () => { setMode(mode==='bldedit'?'nav':'bldedit'); };
+    ui.btnEditCam.onclick = () => { setMode(mode==='camedit'?'nav':'camedit'); };
+
+    ui.btnAddBld.onclick = () => {
+      // Nuevo edificio con medidas actuales de sliders
+      const w = parseFloat(ui.rngBW.value);
+      const d = parseFloat(ui.rngBD.value);
+      const h = parseFloat(ui.rngBH.value);
+      const pos = world.worldToLocal(controls.target.clone());
+      bldData.push({ name: 'Nuevo', type: 'box', w, d, h, x: pos.x, z: pos.z, color: '#dfe6ea' });
+      rebuildBuildings();
+      selected.kind='building'; selected.idx=bldData.length-1;
+      setBuildingSelected(selected.idx);
+      applyBldControlsFromSelected(selected.idx);
+      saveLocal();
+      showMsg('✅ Edificio creado (se puede arrastrar).', true);
+    };
+
+    ui.btnDeleteSel.onclick = () => {
+      if(!selected.kind) return showMsg('Selecciona algo primero.', false);
+      if(selected.kind==='building'){
+        if(confirm('¿Borrar edificio seleccionado?')){
+          bldData.splice(selected.idx,1);
+          rebuildBuildings();
+          selected.kind=null; selected.idx=null;
+          saveLocal();
+        }
+      }
+      if(selected.kind==='camera'){
+        if(confirm('¿Borrar cámara seleccionada?')){
+          const delId = (state.cameras[selected.idx] && state.cameras[selected.idx].id) ? state.cameras[selected.idx].id : null;
+          state.cameras.splice(selected.idx,1);
+          if(delId && camPlan.length){
+            const p = camPlan.find(x => x.id === delId);
+            if(p){ p.placed = false; planCurrentId = getNextUnplaced(planCurrentId); refreshPlanUI(); }
+          }
+          renderCameras();
+          selected.kind=null; selected.idx=null;
+          saveLocal();
+        }
+      }
+    };
+    ui.btnCam.onclick = () => setMode(mode==='cam'?'nav':'cam');
+    ui.btnClearCams.onclick = () => { if(confirm("¿Borrar cámaras?")) { state.cameras=[]; renderCameras(); if(camPlan.length){ camPlan.forEach(p=>p.placed=false); planCurrentId=getNextUnplaced(null); refreshPlanUI(); } saveLocal(); }};
+    ui.btnPer.onclick = () => setMode(mode==='per'?'nav':'per');
+    ui.btnUndoPer.onclick = undoPerimeter;
+    ui.btnClearPer.onclick = () => { state.perimeterPts=[]; drawPerimeter(); grpFence.clear(); saveLocal(); };
+    ui.btnFinishPer.onclick = generateFence;
+
+    // --- Capas (Layers) ---
+    if(ui.btnLayerCams){
+      ui.btnLayerCams.onclick = () => { layers.cams = !layers.cams; setLayerBtn(ui.btnLayerCams, layers.cams); applyLayers(); };
+    }
+    if(ui.btnLayerCones){
+      ui.btnLayerCones.onclick = () => { layers.cones = !layers.cones; setLayerBtn(ui.btnLayerCones, layers.cones); applyLayers(); };
+    }
+    if(ui.btnLayerLabels){
+      ui.btnLayerLabels.onclick = () => { layers.labels = !layers.labels; setLayerBtn(ui.btnLayerLabels, layers.labels); applyLayers(); };
+    }
+
+    // --- Plan de cámaras (Excel -> camera_plan.json) ---
+    if(ui.planSelect){
+      ui.planSelect.onchange = () => setPlanCurrent(ui.planSelect.value);
+    }
+    if(ui.btnPlanReload){
+      ui.btnPlanReload.onclick = async () => { await loadPlan(); showMsg('🔄 Plan recargado.', true); };
+    }
+    if(ui.btnPlanReset){
+      ui.btnPlanReset.onclick = () => {
+        if(!camPlan.length) return;
+        if(confirm('¿Resetear plan? (marcar TODAS como no colocadas)')){
+          camPlan.forEach(p => p.placed = false);
+          planCurrentId = getNextUnplaced(null);
+          refreshPlanUI();
+          showMsg('↺ Plan reseteado.', true);
+        }
+      };
+    }
+    if(ui.btnPlanNext){
+      ui.btnPlanNext.onclick = () => {
+        const cur = ui.planSelect?.value || planCurrentId;
+        setPlanCurrent(getNextUnplaced(cur));
+        refreshPlanUI();
+        if(planCurrentId) showMsg(`⏭️ Siguiente: ${planCurrentId}`, true);
+      };
+    }
+    if(ui.btnPlanPlace){
+      ui.btnPlanPlace.onclick = () => {
+        const id = ui.planSelect?.value || planCurrentId;
+        setPlanCurrent(id);
+        if(!planCurrentId){
+          showMsg('✅ No quedan cámaras del plan.', true);
+          return;
+        }
+        setMode('cam');
+        showMsg(`📌 Colocando: ${planCurrentId} (click en el suelo)`, false);
+      };
+    }
+
+    ui.btnExport.onclick = () => { ui.out.style.display = 'block'; saveLocal(); ui.out.select(); document.execCommand('copy'); showMsg("📋 JSON copiado.", true); };
+    ui.btnImport.onclick = () => { ui.out.style.display = 'block'; const val = ui.out.value.trim(); if(val) importJSON(val); else showMsg("Pega JSON primero.", false); };
+    ui.btnWipe.onclick = () => { if(confirm("¿Borrar TODO?")){ try{ [AUTOSAVE_KEY, ...AUTOSAVE_FALLBACK_KEYS].forEach(k => localStorage.removeItem(k)); }catch(e){} location.reload(); }};
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    window.addEventListener('pointerdown', (ev) => {
+      if(ev.target !== renderer.domElement) return;
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      if(allLocked) return;
+
+      // --- Selección en modos de edición ---
+      if(mode === 'bldedit'){
+        const hitsB = raycaster.intersectObjects(grpBld.children, true);
+        if(hitsB.length){
+          const obj = hitsB[0].object;
+          const idx = obj.userData && obj.userData.kind==='building' ? obj.userData.idx : null;
+          selected.kind = 'building'; selected.idx = idx;
+          setBuildingSelected(idx);
+          applyBldControlsFromSelected(idx);
+          isDragging = true;
+          // Evita que la vista se mueva mientras arrastras
+          controls.enabled = false;
+          return;
+        }
+      }
+      if(mode === 'camedit'){
+        const hitsC = raycaster.intersectObjects(grpCams.children, true);
+        if(hitsC.length){
+          let obj = hitsC[0].object;
+          while(obj && !(obj.userData && obj.userData.kind==='camera')) obj = obj.parent;
+          const idx = obj && obj.userData ? obj.userData.idx : null;
+          selected.kind = 'camera'; selected.idx = idx;
+          setCameraSelected(idx);
+          // sincroniza sliders con la cámara seleccionada
+          const c = state.cameras[idx];
+          if(c){
+            ui.rngH.value = c.h; ui.rngA.value = c.angle; ui.rngD.value = c.dist;
+            ui.rngYaw.value = (c.yaw * 180 / Math.PI);
+            updateCamUI();
+            ui.valYaw.textContent = parseFloat(ui.rngYaw.value);
+          }
+          isDragging = true;
+          // Evita que la vista se mueva mientras arrastras
+          controls.enabled = false;
+          return;
+        }
+      }
+
+      // --- Click en suelo para modos existentes ---
+      const hits = raycaster.intersectObjects(grpGround.children);
+      if(hits.length > 0){
+        const pt = hits[0].point;
+        if(mode === 'scale') handleScaleClick(pt);
+        else if(mode === 'per') addPerimeterPt(pt);
+        else if(mode === 'cam') addCamera(pt);
+        else if(mode === 'measure') handleMeasureClick(pt);
+        else if(mode === 'area') handleAreaClick(pt);
+      }
+    });
+
+    window.addEventListener('pointermove', (ev) => {
+      if(allLocked) return;
+
+      // --- Preview de medición (modo 📐) ---
+      if(mode === 'measure' && measureStep === 1 && ev.target === renderer.domElement){
+        mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+        mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hitsM = raycaster.intersectObjects(grpGround.children);
+        if(hitsM.length > 0){
+          updateMeasurePreview(hitsM[0].point);
+        }
+      }
+
+      // --- Preview de área (modo 🔳) ---
+      if(mode === 'area' && !areaClosed && areaPts.length > 0 && ev.target === renderer.domElement){
+        mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+        mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hitsA = raycaster.intersectObjects(grpGround.children);
+        if(hitsA.length > 0){
+          updateAreaPreview(hitsA[0].point);
+        }
+      }
+      if(!isDragging) return;
+      if(!(mode === 'bldedit' || mode === 'camedit')) return;
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hit = new THREE.Vector3();
+      if(!raycaster.ray.intersectPlane(dragPlane, hit)) return;
+      const local = world.worldToLocal(hit.clone());
+
+      if(selected.kind === 'building'){
+        const idx = selected.idx;
+        if(idx == null || idx < 0 || idx >= bldMeshes.length) return;
+        const m = bldMeshes[idx];
+        const b = bldData[idx];
+        m.position.x = local.x; m.position.z = local.z;
+        b.x = local.x; b.z = local.z;
+        saveLocal();
+      }
+
+      if(selected.kind === 'camera'){
+        const idx = selected.idx;
+        if(idx == null || idx < 0 || idx >= camRoots.length) return;
+        const g = camRoots[idx];
+        g.position.x = local.x; g.position.z = local.z;
+        const c = state.cameras[idx];
+        if(c){ c.x = local.x; c.z = local.z; }
+        saveLocal();
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      isDragging = false;
+      // Restaura controles al terminar el arrastre (si el fondo no está bloqueado)
+      if(!viewLocked) controls.enabled = true;
+    });
+
+    function resetView(){
+      // Enfoca la vista a la base (perímetro) si existe
+      if(state.perimeterPts && state.perimeterPts.length >= 2){
+        fitGroundToPerimeter();
+        // Calcula tamaño aproximado para colocar la cámara
+        let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+        for(const p of state.perimeterPts){ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z); }
+        const cx=(minX+maxX)/2, cz=(minZ+maxZ)/2;
+        const w=maxX-minX, h=maxZ-minZ;
+        const r=Math.max(w,h) || 200;
+        controls.reset();
+        controls.target.set(cx,0,cz);
+        camera.position.set(cx, r*0.75, cz + r*0.85);
+        controls.update();
+      } else {
+        controls.reset();
+        camera.position.set(0, 100, 150);
+        controls.target.set(0,0,0);
+        controls.update();
+      }
+    }
+    
+    function capturePNG(){
+      try {
+        const hud = document.getElementById('hud');
+        const prevHud = hud.style.display;
+        const prevErr = ui.err.style.display;
+
+        // Oculta UI para captura limpia
+        hud.style.display = 'none';
+        ui.err.style.display = 'none';
+
+        // Render limpio
+        renderer.render(scene, camera);
+        const srcUrl = renderer.domElement.toDataURL('image/png');
+
+        // Restaura UI
+        hud.style.display = prevHud || '';
+        ui.err.style.display = prevErr || 'none';
+
+        const img = new Image();
+        img.onload = () => {
+          const w = renderer.domElement.width;
+          const h = renderer.domElement.height;
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Overlay
+          const site = (ui.txtSite?.value || 'CCTV Layout').trim();
+          const dt = new Date().toLocaleString('es-MX');
+          const scaleTxt = ui.scalePill?.textContent || '';
+          const camsCount = (state.cameras||[]).length;
+          const bldCount = (bldData||[]).length;
+
+          const lines = [
+            site,
+            dt,
+            `Cámaras: ${camsCount}  |  Edificios: ${bldCount}`,
+            scaleTxt
+          ].filter(Boolean);
+
+          const DPR = Math.max(1, Math.min(2, (window.devicePixelRatio||1)));
+          const pad = Math.round(18 * DPR);
+          const fontSize = Math.round(18 * DPR);
+          ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+          const lineH = Math.round(fontSize * 1.35);
+          const boxW = Math.max(...lines.map(t => ctx.measureText(t).width)) + pad*2;
+          const boxH = lines.length * lineH + pad*2;
+
+          ctx.fillStyle = 'rgba(0,0,0,0.52)';
+          ctx.fillRect(pad, pad, boxW, boxH);
+
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          lines.forEach((t,i) => ctx.fillText(t, pad*2, pad*2 + i*lineH + fontSize*0.9));
+
+          const safe = (site || 'CCTV').replace(/[^a-z0-9\-_]+/gi, '_').slice(0,60) || 'CCTV';
+          const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+          const a = document.createElement('a');
+          a.download = `${safe}_${stamp}.png`;
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+
+          showMsg('📸 Captura descargada.', true);
+        };
+        img.onerror = () => showMsg('No se pudo capturar (imagen inválida).', false);
+        img.src = srcUrl;
+      } catch(e){
+        console.error(e);
+        showMsg('No se pudo capturar. Revisa consola.', false);
+      }
+    }
+
+function showMsg(txt, isSuccess){
+      ui.err.textContent = txt; ui.err.className = isSuccess ? 'success-msg' : ''; ui.err.style.display = 'block';
+      setTimeout(() => ui.err.style.display='none', 3000);
+    }
+    let __lastT = 0;
+    function anim(t=0){
+      requestAnimationFrame(anim);
+      const fps = mobilePerf ? 30 : 60;
+      const minDt = 1000 / fps;
+      if(t - __lastT < minDt) return;
+      __lastT = t;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    ui.btnShot?.addEventListener('click', capturePNG);
+
+      loadLocal(); syncStyleUI(); anim();
+  </script>
+</body>
+</html>

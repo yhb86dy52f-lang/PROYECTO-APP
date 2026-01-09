@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CCTV — Visor 3D Pro (v5)</title>
+  <style>
+    html, body { margin:0; height:100%; overflow:hidden; background:#0b0f14; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    
+    /* HUD Principal */
+    #hud {
+      position:fixed; left:12px; top:12px; z-index:10;
+      color:#e7eefc; background: rgba(10, 15, 20, 0.85);
+      padding:12px 16px; border-radius:12px; width: 340px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      max-height: 90vh; overflow-y: auto;
+    }
+
+    h3 { margin: 0 0 10px 0; font-size: 16px; display:flex; justify-content:space-between; align-items:center; }
+    .status-dot { width:8px; height:8px; background:#4caf50; border-radius:50%; display:inline-block; margin-right:6px; box-shadow:0 0 8px #4caf50; }
+    
+    /* Controles y Botones */
+    .section { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .section:last-child { border-bottom: none; }
+    
+    .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+    
+    button {
+      flex: 1; cursor:pointer; border:1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05); color:#ccc;
+      padding:6px 10px; border-radius:6px; font-size: 12px; transition: all 0.2s;
+    }
+    button:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    button.active { background: rgba(60, 100, 255, 0.3); border-color: rgba(100, 150, 255, 0.6); color: #fff; box-shadow: 0 0 8px rgba(60, 100, 255, 0.2); }
+    button.danger { color: #ff8888; border-color: rgba(255, 100, 100, 0.2); }
+    button.success { color: #88ffaa; border-color: rgba(100, 255, 150, 0.2); }
+
+    /* Inputs de rango */
+    label { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 6px; }
+    input[type=range] { width: 100%; margin: 4px 0 8px 0; accent-color: #4a90e2; cursor: pointer; }
+    .val-disp { color: #fff; font-weight: bold; }
+
+    /* TextArea y otros */
+    textarea {
+      width: 100%; height: 80px; resize: vertical;
+      background: rgba(0,0,0,0.5); color:#fff;
+      border:1px solid rgba(255,255,255,0.1); border-radius:6px;
+      font-family: monospace; font-size: 11px; margin-top:8px; display:none;
+    }
+    .pill { font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.1); margin-left: auto; }
+
+    /* Notificaciones */
+    #err {
+      position:fixed; left:50%; bottom:20px; transform: translateX(-50%); z-index:20;
+      font: 13px system-ui; color:#fff; background: rgba(20,20,20,0.9);
+      border:1px solid #444; padding:10px 20px; border-radius:20px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.6); display:none; text-align: center;
+    }
+    .success-msg { border-color: #2e7d32 !important; background: rgba(10, 30, 10, 0.95) !important; color: #a5d6a7 !important; }
+  </style>
+</head>
+<body>
+
+  <div id="hud">
+    <h3>
+      <span><span class="status-dot"></span>CCTV Visor Pro v5</span>
+      <span id="scalePill" class="pill">Sin Calibrar</span>
+    </h3>
+
+    <div class="section">
+      <label>HERRAMIENTAS GLOBALES</label>
+      <div class="row">
+        <button id="btnReset">👁️ Reset Vista</button>
+        <button id="btnScale">📏 Calibrar (Metros)</button>
+        <button id="btnToggleBld">🏢 Edificios</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <label>CONFIGURACIÓN DE CÁMARA <span id="camStatus" style="color:#4a90e2"></span></label>
+      <div class="row" style="margin-bottom:10px;">
+        <button id="btnCam" style="flex:2">📹 MODO CÁMARA</button>
+        <button id="btnClearCams" class="danger">Borrar Cams</button>
+      </div>
+      
+      <div id="camControls" style="opacity:0.5; pointer-events:none; transition: opacity 0.3s;">
+        <label>Altura: <span id="valH" class="val-disp">3.0</span> m</label>
+        <input type="range" id="rngH" min="1" max="15" step="0.5" value="3.0">
+
+        <label>Ángulo Inclinación: <span id="valA" class="val-disp">20</span>°</label>
+        <input type="range" id="rngA" min="0" max="90" step="5" value="20">
+
+        <label>Distancia Visión: <span id="valD" class="val-disp">30</span> m</label>
+        <input type="range" id="rngD" min="5" max="150" step="5" value="30">
+      </div>
+    </div>
+
+    <div class="section">
+      <label>PERÍMETRO / CERCADO</label>
+      <div class="row">
+        <button id="btnPer">🚧 Modo Perímetro</button>
+        <button id="btnUndoPer">↩️ Deshacer</button>
+      </div>
+      <div class="row">
+        <button id="btnFinishPer" class="success">✅ Cerrar/Generar</button>
+        <button id="btnClearPer" class="danger">🗑️ Borrar Todo</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <label>GESTIÓN DE DATOS (JSON)</label>
+      <div class="row">
+        <button id="btnExport">💾 Exportar</button>
+        <button id="btnImport">📂 Importar</button>
+        <button id="btnWipe" class="danger">⚠️ Reset Total</button>
+      </div>
+      <textarea id="out" placeholder="Copia/Pega JSON aquí..."></textarea>
+    </div>
+
+    <div style="font-size:10px; color:#666; text-align:center; margin-top:5px;">
+      Auto-guardado activo (LocalStorage)
+    </div>
+  </div>
+
+  <div id="err"></div>
+
+  <script type="module">
+    // --- Referencias UI ---
+    const ui = {
+      err: document.getElementById('err'),
+      out: document.getElementById('out'),
+      scalePill: document.getElementById('scalePill'),
+      btnReset: document.getElementById('btnReset'),
+      btnScale: document.getElementById('btnScale'),
+      btnToggleBld: document.getElementById('btnToggleBld'),
+      btnCam: document.getElementById('btnCam'),
+      btnClearCams: document.getElementById('btnClearCams'),
+      camControls: document.getElementById('camControls'),
+      btnPer: document.getElementById('btnPer'),
+      btnUndoPer: document.getElementById('btnUndoPer'),
+      btnFinishPer: document.getElementById('btnFinishPer'),
+      btnClearPer: document.getElementById('btnClearPer'),
+      btnExport: document.getElementById('btnExport'),
+      btnImport: document.getElementById('btnImport'),
+      btnWipe: document.getElementById('btnWipe'),
+      rngH: document.getElementById('rngH'),
+      rngA: document.getElementById('rngA'),
+      rngD: document.getElementById('rngD'),
+      valH: document.getElementById('valH'),
+      valA: document.getElementById('valA'),
+      valD: document.getElementById('valD'),
+    };
+
+    const camSettings = { h: 3.0, angle: 20, dist: 30 };
+
+    function updateCamUI(){
+      camSettings.h = parseFloat(ui.rngH.value);
+      camSettings.angle = parseFloat(ui.rngA.value);
+      camSettings.dist = parseFloat(ui.rngD.value);
+      ui.valH.textContent = camSettings.h.toFixed(1);
+      ui.valA.textContent = camSettings.angle;
+      ui.valD.textContent = camSettings.dist;
+    }
+    ui.rngH.addEventListener('input', updateCamUI);
+    ui.rngA.addEventListener('input', updateCamUI);
+    ui.rngD.addEventListener('input', updateCamUI);
+
+   async function loadThree() {
+  try {
+    const T = await import("./vendor/three.module.js");
+    const O = await import("./vendor/OrbitControls.js");
+    return { THREE: T, OrbitControls: O.OrbitControls };
+  } catch (e) {
+    console.error("Fallo import local:", e);
+    throw new Error("No se pudo cargar Three.js local. Revisa vendor/OrbitControls.js y vendor/three.module.js");
+  }
+}
+
+
+    let THREE, OrbitControls;
+    try {
+      const lib = await loadThree();
+      THREE = lib.THREE;
+      OrbitControls = lib.OrbitControls;
+    } catch (e) {
+      showMsg("❌ Error crítico: " + e.message, true);
+      throw e;
+    }
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0f14);
+    scene.fog = new THREE.Fog(0x0b0f14, 20, 300);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 2000);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:"high-performance" });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI/2 - 0.05;
+    
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    scene.add(hemiLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(100, 200, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.left = -200; dirLight.shadow.camera.right = 200;
+    dirLight.shadow.camera.top = 200; dirLight.shadow.camera.bottom = -200;
+    scene.add(dirLight);
+
+    const world = new THREE.Group(); scene.add(world);
+    const grpGround = new THREE.Group(); world.add(grpGround);
+    const grpBld = new THREE.Group(); world.add(grpBld);
+    const grpFence = new THREE.Group(); world.add(grpFence);
+    const grpCams = new THREE.Group(); world.add(grpCams);
+    const grpHelpers = new THREE.Group(); world.add(grpHelpers);
+
+    let worldScale = 1;
+    const texLoader = new THREE.TextureLoader();
+    let groundW = 200, groundH = 200;
+    
+    function buildGround(tex = null){
+      grpGround.clear();
+      const mat = new THREE.MeshStandardMaterial({ 
+        color: tex ? 0xffffff : 0x222222, 
+        map: tex, 
+        roughness: 0.8 
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(groundW, groundH), mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.receiveShadow = true;
+      grpGround.add(mesh);
+
+      const grid = new THREE.GridHelper(Math.max(groundW, groundH), 50, 0x555555, 0x222222);
+      grid.position.y = 0.05;
+      grid.material.transparent = true;
+      grid.material.opacity = 0.3;
+      grpGround.add(grid);
+    }
+    
+    texLoader.load('./ground.jpg', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      groundW = 150; 
+      groundH = 150 * (tex.image.height / tex.image.width);
+      buildGround(tex);
+      resetView();
+    }, undefined, () => buildGround(null));
+
+    fetch('./scene.json').then(r=>r.json()).then(data => {
+      if(data.buildings){
+        data.buildings.forEach(b => {
+          const m = new THREE.MeshStandardMaterial({ color: b.color || 0xcccccc });
+          const box = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), m);
+          box.position.set(b.x, b.h/2, b.z);
+          box.castShadow = true; box.receiveShadow = true;
+          grpBld.add(box);
+        });
+      }
+    }).catch(() => console.log("Sin scene.json, modo vacío."));
+
+    let mode = 'nav'; 
+    const state = { perimeterPts: [], cameras: [] };
+
+    function setMode(m){
+      mode = m;
+      ui.btnCam.classList.toggle('active', mode === 'cam');
+      ui.btnPer.classList.toggle('active', mode === 'per');
+      ui.btnScale.classList.toggle('active', mode === 'scale');
+      ui.camControls.style.opacity = (mode === 'cam') ? '1' : '0.3';
+      ui.camControls.style.pointerEvents = (mode === 'cam') ? 'auto' : 'none';
+      if(mode === 'scale') showMsg("📏 Click en Punto A y luego Punto B para calibrar.", false);
+    }
+
+    let scaleStep = 0, pA = null;
+    function handleScaleClick(pt){
+      if(scaleStep === 0){
+        pA = pt.clone();
+        scaleStep = 1;
+        showMsg("📏 Punto A fijado. Ahora click en Punto B.", false);
+      } else {
+        const dist3D = pA.distanceTo(pt);
+        const realStr = prompt(`Distancia 3D actual: ${dist3D.toFixed(2)} unidades.\n¿Cuántos METROS reales son?`, "100");
+        const real = parseFloat(realStr);
+        if(real > 0){
+          const factor = real / dist3D;
+          setWorldScale(worldScale * factor);
+          showMsg(`✅ Calibrado. Factor aplicado: ${factor.toFixed(4)}`, true);
+        }
+        setMode('nav');
+        scaleStep = 0; pA = null;
+      }
+    }
+
+    function setWorldScale(s){
+      worldScale = s;
+      world.scale.setScalar(worldScale);
+      ui.scalePill.textContent = (worldScale===1) ? "Sin Calibrar" : "Calibrado (1u = " + (1/s).toFixed(2) +"m)";
+      saveLocal();
+    }
+
+    function addPerimeterPt(pt){
+      const localPt = world.worldToLocal(pt.clone());
+      state.perimeterPts.push(localPt);
+      drawPerimeter();
+      saveLocal();
+    }
+
+    function undoPerimeter(){
+      if(state.perimeterPts.length > 0){
+        state.perimeterPts.pop();
+        drawPerimeter();
+        saveLocal();
+        showMsg("Deshecho último punto", false);
+      }
+    }
+
+    function drawPerimeter(){
+      grpHelpers.clear();
+      grpFence.clear();
+      const dotGeom = new THREE.SphereGeometry(0.4, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      state.perimeterPts.forEach(p => {
+        const d = new THREE.Mesh(dotGeom, dotMat);
+        d.position.copy(p);
+        d.position.y = 0.2;
+        grpHelpers.add(d);
+      });
+      if(state.perimeterPts.length > 1){
+        const pts = [...state.perimeterPts];
+        const geom = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0xffff00 }));
+        grpHelpers.add(line);
+      }
+    }
+
+    function generateFence(){
+      if(state.perimeterPts.length < 3) return showMsg("⚠️ Mínimo 3 puntos para cerrar.", false);
+      grpFence.clear();
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness:0.9 });
+      const pts = state.perimeterPts;
+      for(let i=0; i<pts.length; i++){
+        const curr = pts[i];
+        const next = pts[(i+1) % pts.length];
+        const vec = new THREE.Vector3().subVectors(next, curr);
+        const len = vec.length();
+        const angle = Math.atan2(vec.x, vec.z);
+        const h = 2.5; 
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, len), wallMat);
+        wall.position.set((curr.x+next.x)/2, h/2, (curr.z+next.z)/2);
+        wall.rotation.y = angle;
+        wall.castShadow = true;
+        grpFence.add(wall);
+      }
+      showMsg("✅ Valla generada.", true);
+    }
+
+    function addCamera(pt){
+      const localPt = world.worldToLocal(pt.clone());
+      const cData = {
+        x: localPt.x, z: localPt.z,
+        h: camSettings.h, angle: camSettings.angle, dist: camSettings.dist, yaw: 0
+      };
+      const lookAt = new THREE.Vector3(0,0,0);
+      const dir = new THREE.Vector3().subVectors(lookAt, localPt).normalize();
+      cData.yaw = Math.atan2(dir.x, dir.z);
+      state.cameras.push(cData);
+      renderCameras();
+      saveLocal();
+    }
+
+    function renderCameras(){
+      grpCams.clear();
+      state.cameras.forEach(c => {
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, c.h), new THREE.MeshStandardMaterial({color:0x333333}));
+        body.position.set(c.x, c.h/2, c.z);
+        grpCams.add(body);
+        const coneGeom = new THREE.ConeGeometry(Math.tan(THREE.MathUtils.degToRad(30)) * c.dist, c.dist, 32, 1, true);
+        const coneMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
+        const cone = new THREE.Mesh(coneGeom, coneMat);
+        cone.geometry.translate(0, -c.dist/2, 0); 
+        cone.geometry.rotateX(-Math.PI/2);
+        const pivot = new THREE.Group();
+        pivot.add(cone);
+        pivot.position.set(c.x, c.h, c.z);
+        pivot.rotation.y = c.yaw;
+        pivot.rotateX(THREE.MathUtils.degToRad(c.angle));
+        grpCams.add(pivot);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.5), new THREE.MeshStandardMaterial({color:0xff0000}));
+        const headPivot = new THREE.Group();
+        headPivot.add(head);
+        headPivot.position.set(c.x, 0, c.z); 
+        headPivot.rotation.y = c.yaw;
+        pivot.add(head.clone());
+      });
+    }
+
+    function saveLocal(){
+      const data = { v: 5, scale: worldScale, per: state.perimeterPts.map(p => ({x:p.x, z:p.z})), cams: state.cameras };
+      localStorage.setItem('cctv_v5_autosave', JSON.stringify(data));
+      ui.out.value = JSON.stringify(data, null, 2);
+    }
+    function loadLocal(){
+      const raw = localStorage.getItem('cctv_v5_autosave');
+      if(raw) importJSON(raw, true);
+    }
+    function importJSON(jsonStr, silent=false){
+      try{
+        const d = JSON.parse(jsonStr);
+        if(d.scale) setWorldScale(d.scale);
+        if(d.per){
+          state.perimeterPts = d.per.map(p => new THREE.Vector3(p.x, 0, p.z));
+          drawPerimeter();
+          if(state.perimeterPts.length > 2) generateFence();
+        }
+        if(d.cams){
+          state.cameras = d.cams;
+          renderCameras();
+        }
+        if(!silent) showMsg("✅ Datos cargados correctamente.", true);
+      } catch(e){
+        if(!silent) showMsg("❌ JSON inválido.", false);
+      }
+    }
+
+    ui.btnReset.onclick = resetView;
+    ui.btnScale.onclick = () => setMode('scale');
+    ui.btnToggleBld.onclick = () => { grpBld.visible = !grpBld.visible; };
+    ui.btnCam.onclick = () => setMode(mode==='cam'?'nav':'cam');
+    ui.btnClearCams.onclick = () => { if(confirm("¿Borrar cámaras?")) { state.cameras=[]; renderCameras(); saveLocal(); }};
+    ui.btnPer.onclick = () => setMode(mode==='per'?'nav':'per');
+    ui.btnUndoPer.onclick = undoPerimeter;
+    ui.btnClearPer.onclick = () => { state.perimeterPts=[]; drawPerimeter(); grpFence.clear(); saveLocal(); };
+    ui.btnFinishPer.onclick = generateFence;
+    ui.btnExport.onclick = () => { ui.out.style.display = 'block'; saveLocal(); ui.out.select(); document.execCommand('copy'); showMsg("📋 JSON copiado.", true); };
+    ui.btnImport.onclick = () => { ui.out.style.display = 'block'; const val = ui.out.value.trim(); if(val) importJSON(val); else showMsg("Pega JSON primero.", false); };
+    ui.btnWipe.onclick = () => { if(confirm("¿Borrar TODO?")){ localStorage.removeItem('cctv_v5_autosave'); location.reload(); }};
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    window.addEventListener('pointerdown', (ev) => {
+      if(ev.target !== renderer.domElement) return;
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(grpGround.children);
+      if(hits.length > 0){
+        const pt = hits[0].point;
+        if(mode === 'scale') handleScaleClick(pt);
+        else if(mode === 'per') addPerimeterPt(pt);
+        else if(mode === 'cam') addCamera(pt);
+      }
+    });
+
+    function resetView(){ controls.reset(); camera.position.set(0, 100, 150); controls.target.set(0,0,0); controls.update(); }
+    function showMsg(txt, isSuccess){
+      ui.err.textContent = txt; ui.err.className = isSuccess ? 'success-msg' : ''; ui.err.style.display = 'block';
+      setTimeout(() => ui.err.style.display='none', 3000);
+    }
+    function anim(){ requestAnimationFrame(anim); controls.update(); renderer.render(scene, camera); }
+    loadLocal(); anim();
+  </script>
+</body>
+</html>
