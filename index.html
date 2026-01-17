@@ -518,7 +518,7 @@
 
     
     // --- Optimización móvil (auto) ---
-    const IS_MOBILE = (matchMedia && matchMedia('(pointer:coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const IS_MOBILE = ((typeof matchMedia === 'function') && matchMedia('(pointer:coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const PERF_KEY = 'cctv_mobile_perf_v1';
     let mobilePerf = IS_MOBILE;
     try {
@@ -1746,6 +1746,7 @@ function closeArea(){
         refreshPlanUI();
       } catch(e){
         camPlan = [];
+        planCurrentId = null;
         if(ui.planInfo) ui.planInfo.textContent = 'Plan: no encontrado (camera_plan.json).';
         if(ui.planSelect) ui.planSelect.innerHTML = '';
       }
@@ -1892,6 +1893,24 @@ function closeArea(){
       }
     }
 
+    async function copyTextToClipboard(text, inputEl){
+      if(navigator.clipboard?.writeText){
+        try{
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch(e) {}
+      }
+      try{
+        if(inputEl){
+          inputEl.focus();
+          inputEl.select();
+        }
+        return document.execCommand('copy');
+      } catch(e){
+        return false;
+      }
+    }
+
     ui.btnReset.onclick = resetView;
     ui.btnScale.onclick = () => setMode('scale');
     ui.btnToggleBld.onclick = () => { grpBld.visible = !grpBld.visible; };
@@ -2005,7 +2024,12 @@ function closeArea(){
       };
     }
 
-    ui.btnExport.onclick = () => { ui.out.style.display = 'block'; saveLocal(); ui.out.select(); document.execCommand('copy'); showMsg("📋 JSON copiado.", true); };
+    ui.btnExport.onclick = async () => {
+      ui.out.style.display = 'block';
+      saveLocal();
+      const copied = await copyTextToClipboard(ui.out.value, ui.out);
+      showMsg(copied ? "📋 JSON copiado." : "⚠️ No se pudo copiar automáticamente.", copied);
+    };
     ui.btnImport.onclick = () => { ui.out.style.display = 'block'; const val = ui.out.value.trim(); if(val) importJSON(val); else showMsg("Pega JSON primero.", false); };
     ui.btnWipe.onclick = () => { if(confirm("¿Borrar TODO?")){ try{ [AUTOSAVE_KEY, ...AUTOSAVE_FALLBACK_KEYS].forEach(k => localStorage.removeItem(k)); }catch(e){} location.reload(); }};
 
