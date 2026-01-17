@@ -14,4 +14,5 @@ Uso rápido:
 6) Exportar: copia JSON. Importar: pega JSON y Ctrl+Enter.
 
 Offline:
-- Si tu red bloquea CDNs, ejecuta download_vendor.bat y recarga (Ctrl+F5).
+- Si tu red bloquea CDNs, ejecuta download_vendor.bat o download_vendor.ps1 y recarga (Ctrl+F5).
+- Si no existe /vendor, el visor intentará cargar Three.js desde CDN automáticamente.

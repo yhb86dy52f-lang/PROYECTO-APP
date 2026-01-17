@@ -474,22 +474,36 @@
       ui.valYaw.textContent = parseFloat(ui.rngYaw.value);
     }
 
+    const THREE_VERSION = '0.159.0';
+    const THREE_LOCAL = './vendor/three.module.js';
+    const ORBIT_LOCAL = './vendor/OrbitControls.js';
+    const THREE_CDN = `https://unpkg.com/three@${THREE_VERSION}/build/three.module.js`;
+    const ORBIT_CDN = `https://unpkg.com/three@${THREE_VERSION}/examples/jsm/controls/OrbitControls.js`;
+
+    function importThree(threeUrl, orbitUrl) {
+      return Promise.all([import(threeUrl), import(orbitUrl)])
+        .then(([T, O]) => ({ THREE: T, OrbitControls: O.OrbitControls }))
+        .catch(() => null);
+    }
+
     async function loadThree() {
-      // Offline-first: usamos SOLO el vendor local para evitar:
+      // Offline-first: intentamos primero el vendor local para evitar:
       // 1) errores por red / CORS
       // 2) el warning de "Multiple instances of Three.js" (cuando mezclas CDN + local)
-      //
-      // Si algo falla aquí, casi siempre es porque vendor/Controls.js está corrupto
-      // (por ejemplo, descargado como HTML 404). Ya está corregido en este proyecto.
-      try {
-        const T = await import('./vendor/three.module.js');
-        const O = await import('./vendor/OrbitControls.js');
-        return { THREE: T, OrbitControls: O.OrbitControls };
-      } catch (e) {
-        throw new Error(
-          'No se pudo cargar Three.js local. Verifica que existan ./vendor/three.module.js, ./vendor/OrbitControls.js y ./vendor/Controls.js (válido).'
-        );
+      const local = await importThree(THREE_LOCAL, ORBIT_LOCAL);
+      if(local){
+        return { ...local, source: 'local' };
       }
+
+      const cdn = await importThree(THREE_CDN, ORBIT_CDN);
+      if(cdn){
+        showMsg('⚠️ Vendor local no disponible. Usando CDN de Three.js.', false);
+        return { ...cdn, source: 'cdn' };
+      }
+
+      throw new Error(
+        'No se pudo cargar Three.js (vendor local o CDN). Verifica ./vendor/three.module.js y ./vendor/OrbitControls.js.'
+      );
     }
 
     let THREE, OrbitControls;
